@@ -21,18 +21,19 @@
  * Boston, MA  02110-1301, USA.
  */
 
-#include <arpa/nameser.h>
-#include <net/if.h>
-#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
-#include <sys/time.h>
-#include <sys/types.h>
 #include <ifaddrs.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/nameser.h>
+#include <net/if.h>
 
 #include "ddns.h"
 #include "cache.h"
@@ -545,6 +546,9 @@ static int send_update(ddns_t *ctx, ddns_info_t *info, ddns_alias_t *alias, int 
 	int            rc;
 	http_trans_t   trans;
 	http_t        *client = &info->server;
+
+	if (info->system->setup)
+		DO(info->system->setup(ctx, info, alias));
 
 	client->ssl_enabled = info->ssl_enabled;
 	rc = http_init(client, "Sending IP# update to DDNS server");

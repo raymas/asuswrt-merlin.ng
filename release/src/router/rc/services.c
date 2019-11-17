@@ -3394,6 +3394,9 @@ start_ddns(void)
 	FILE *fp;
 	FILE *time_fp;
 	char *wan_ip, *wan_ifname;
+#ifdef RTCONFIG_IPV6
+	char *wan_ipv6;
+#endif // RTCONFIG_IPV6
 //	char *ddns_cache;
 	char *server;
 	char *user;
@@ -3432,9 +3435,16 @@ start_ddns(void)
 #endif
 	snprintf(prefix, sizeof(prefix), "wan%d_", unit);
 	wan_ip = nvram_safe_get(strcat_r(prefix, "ipaddr", tmp));
+#ifdef RTCONFIG_IPV6
+	wan_ipv6 = nvram_safe_get("ipv6_rtr_addr");
+#endif // RTCONFIG_IPV6
 	wan_ifname = get_wan_ifname(unit);
 
-	if (!wan_ip || strcmp(wan_ip, "") == 0 || !inet_addr(wan_ip)) {
+	if ( (!wan_ip || strcmp(wan_ip, "") == 0 || !inet_addr(wan_ip)) 
+#ifdef RTCONFIG_IPV6
+       && (!wan_ipv6 || strcmp(wan_ipv6, "") == 0)
+#endif // RTCONFIG_IPV6
+      ) {
 		logmessage("ddns", "WAN IP is empty.");
 		return -1;
 	}
@@ -3489,7 +3499,12 @@ start_ddns(void)
 	else if (strcmp(server, "WWW.ORAY.COM")==0) {
 		service = "peanuthull";
 		asus_ddns = 2;
-	} else {
+	} 
+	else if (strcmp(server, "WWW.CLOUDFLARE.COM") == 0)
+    	service = "cloudflare.com";
+  	else if (strcmp(server, "WWW.YANDEX.RU") == 0)
+    	service = "yandex.ru";
+  	else {
 		logmessage("start_ddns", "Error ddns server name: %s\n", server);
 		return 0;
 	}
@@ -3534,13 +3549,14 @@ start_ddns(void)
 			chmod(INADYNCONF, 0600);
 			fprintf(fp, "iterations = 1\n");
 
+      // IPV4 Round
 			if (asus_ddns == 10) {
-				fprintf(fp, "custom namecheap {\n");
+				fprintf(fp, "custom namecheap:1 {\n");
 				fprintf(fp, "ddns-server = dynamicdns.park-your-domain.com\n");
 				// We store the domain.tld in the username nvram
 				fprintf(fp, "ddns-path = \"/update?domain=%%u&password=%%p&host=%%h\"\n");
 			} else {
-				fprintf(fp, "provider %s {\n", service);
+				fprintf(fp, "provider %s:1 {\n", service);
 			}
 
 			fprintf(fp, "hostname = %s\n", host);
@@ -3559,6 +3575,41 @@ start_ddns(void)
 				fprintf(fp, "wildcard = true\n");
 
 			fprintf(fp, "}\n");
+
+// IPV6 Round we are creating the same config with :2 argument 
+#ifdef RTCONFIG_IPV6
+			if (!wan_ipv6 || strcmp(wan_ipv6, "") == 0) {
+				logmessage("ddns", "WAN IP V6 is empty.");
+			} else {
+      
+				if (asus_ddns == 10) {
+					fprintf(fp, "custom namecheap:2 {\n");
+					fprintf(fp, "ddns-server = dynamicdns.park-your-domain.com\n");
+					// We store the domain.tld in the username nvram
+					fprintf(fp, "ddns-path = \"/update?domain=%%u&password=%%p&host=%%h\"\n");
+				} else {
+					fprintf(fp, "provider %s:2 {\n", service);
+				}
+
+				fprintf(fp, "hostname = %s\n", host);
+				str_escape_quotes(tmp, user, sizeof(tmp));
+				fprintf(fp, "username = \"%s\"\n", tmp);
+				str_escape_quotes(tmp, passwd, sizeof(tmp));
+				fprintf(fp, "password = \"%s\"\n", tmp);
+
+				if (nvram_get_int("ddns_ipcheck") == 0)	// Internal (local)
+#ifdef HND_ROUTER
+					fprintf(fp, "checkip-command = \"/bin/nvram get ipv6_rtr_addr\"\n");
+#else
+					fprintf(fp, "checkip-command = \"/usr/sbin/nvram get ipv6_rtr_addr\"\n");
+#endif
+				if (wild)
+					fprintf(fp, "wildcard = true\n");
+
+				fprintf(fp, "}\n"); 
+
+			}
+#endif //RTCONFIG_IPV6
 
 			append_custom_config("inadyn.conf", fp);
 

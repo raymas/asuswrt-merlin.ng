@@ -436,6 +436,7 @@ int main(int argc, char *argv[])
 		logit(LOG_DEBUG, "config    : %s", config);
 		logit(LOG_DEBUG, "pidfile   : %s", pidfn);
 		logit(LOG_DEBUG, "cache-dir : %s", cache_dir);
+
 		rc = alloc_context(&ctx);
 		if (rc) {
 			logit(LOG_ERR, "Failed allocating memory, cannot check configuration file.");

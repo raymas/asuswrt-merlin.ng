@@ -506,7 +506,8 @@ static void dhcpv6_send(enum dhcpv6_msg type, uint8_t trid[3], uint32_t ecs)
 		iov[IOV_HDR_IA_NA].iov_len = 0;
 
 	if ((type != DHCPV6_MSG_SOLICIT && type != DHCPV6_MSG_REQUEST) ||
-			!(client_options & DHCPV6_ACCEPT_RECONFIGURE))
+			!(client_options & DHCPV6_ACCEPT_RECONFIGURE) ||
+			(type != DHCPV6_MSG_SOLICIT && !accept_reconfig))
 		iov[IOV_RECONF_ACCEPT].iov_len = 0;
 
 	if (!(client_options & DHCPV6_CLIENT_FQDN))
@@ -1169,6 +1170,11 @@ static int dhcpv6_handle_reply(enum dhcpv6_msg orig, _unused const int rc,
 				odhcp6c_clear_state(STATE_SERVER_ADDR);
 				odhcp6c_add_state(STATE_SERVER_ADDR, &from->sin6_addr, 16);
 			} else if (orig == DHCPV6_MSG_RENEW) {
+/* TODO: partially revert upstream commit "dhcpv6: always trigger script update in case of IA updates"
+ * https://git.openwrt.org/?p=project/odhcp6c.git;a=commit;h=473f248e2db6c6c39e7aecf78f888e44f36ff5c4
+ * this would then cause a loop where clients issue a RENEW and REBIND every ~1s, overwhelming DHCPv6 servers.
+ * refer https://github.com/AlsoBearPerson/odhcp6c/commit/250f56a73e7a1b5e1e90f53982e8915065947450 */
+#if 0
 				// Send further renews if T1 is not set and
 				// no updated IAs
 				if (!t1) {
@@ -1178,8 +1184,18 @@ static int dhcpv6_handle_reply(enum dhcpv6_msg orig, _unused const int rc,
 						// Grace period of 1 second
 						t1 = 1;
 				}
+#else
+				// Send further renews if T1 is not set
+				if (!t1)
+					ret = -1;
+#endif
 
 			} else if (orig == DHCPV6_MSG_REBIND) {
+/* TODO: partially revert upstream commit "dhcpv6: always trigger script update in case of IA updates"
+ * https://git.openwrt.org/?p=project/odhcp6c.git;a=commit;h=473f248e2db6c6c39e7aecf78f888e44f36ff5c4
+ * this would then cause a loop where clients issue a RENEW and REBIND every ~1s, overwhelming DHCPv6 servers.
+ * refer https://github.com/AlsoBearPerson/odhcp6c/commit/250f56a73e7a1b5e1e90f53982e8915065947450 */
+#if 0
 				// Send further rebinds if T1 and T2 is not set and
 				// no updated IAs
 				if (!t1 && !t2) {
@@ -1189,6 +1205,11 @@ static int dhcpv6_handle_reply(enum dhcpv6_msg orig, _unused const int rc,
 						// Grace period of 1 second
 						t2 = 1;
 				}
+#else
+				// Send further rebinds if T1 and T2 is not set
+				if (!t1 && !t2)
+					ret = -1;
+#endif
 
 				odhcp6c_clear_state(STATE_SERVER_ADDR);
 				odhcp6c_add_state(STATE_SERVER_ADDR, &from->sin6_addr, 16);

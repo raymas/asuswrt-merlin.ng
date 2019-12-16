@@ -12445,6 +12445,8 @@ check_ddr_done:
 	{
 		update_nc_setting_conf();
 	}
+//TODO: check the prebuilt files for these variants
+#if !defined(RTAC3200) && !defined(RTAC56U) && !defined(RTAC87U)
 	else if (strcmp(script, "oauth_google_gen_token_email") == 0)
 	{
 		oauth_google_gen_token_email();
@@ -12465,6 +12467,7 @@ check_ddr_done:
 		//  WEVENT_GENERIC_MSG	 "{\""WEVENT_PREFIX"\":{\""EVENT_ID"\":\"%d\"}}"
 #endif	// RTCONFIG_CFGSYNC
 	}
+#endif //prebuilt check
 #endif
 	else if (strcmp(script, "logger") == 0)
 	{

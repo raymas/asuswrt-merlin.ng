@@ -1,19 +1,13 @@
-asuswrt-merlin New Gen (version 382.xx and higher)
-==================================================
+# asuswrt-merlin New Gen (version 382.xx and higher)
 
-#### Please do not use Github's Issue tracker for support requests.  Use the support forums at [SNBForums](https://www.snbforums.com/forums/asuswrt-merlin.42/) instead.  The issue tracker is for development/bug tracking purposes only!
+Fork of [RMerl/asuswrt-merlin.ng](https://github.com/RMerl/asuswrt-merlin.ng)
 
-Asuswrt-Merlin is an enhanced version of Asuswrt, the firmware used by Asus's modern routers.
+With custom options available for dhcp.
 
-The goal of this project is to fix issues and bring some minor functionality adjustments to the 
-original Asus firmware.  While some features do get added, this is not the main focus of this project.  
-It is not meant to replace existing projects such as Tomato or DD-WRT, but rather to offer an alternative 
-for people who prefer the original firmware featureset.
+## Custom builds (raymas)
 
-This is the new development branch, originally based on Asus's 
-3.0.0.4.382_xxxx firmware release.  Development of the 380.xx 
-legacy branch has been dropped.
+This fork aims to upgrade some packages for full compatibility with all ISP.
 
-Please consult the Wiki for an up-to-date list of supported models:
+## Edited packages
 
-https://github.com/RMerl/asuswrt-merlin/wiki/Supported-Devices
+- odhcp6c : for ipv6 custom options support, merge of openwrt's trunk version.

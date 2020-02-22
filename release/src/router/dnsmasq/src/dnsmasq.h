@@ -1,4 +1,4 @@
-/* dnsmasq is Copyright (c) 2000-2018 Simon Kelley
+/* dnsmasq is Copyright (c) 2000-2020 Simon Kelley
  
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#define COPYRIGHT "Copyright (c) 2000-2018 Simon Kelley"
+#define COPYRIGHT "Copyright (c) 2000-2020 Simon Kelley"
 
 /* We do defines that influence behavior of stdio.h, so complain
    if included too early. */
@@ -95,7 +95,11 @@ typedef unsigned long long u64;
 #if defined(HAVE_SOLARIS_NETWORK)
 #  include <sys/sockio.h>
 #endif
-#include <sys/poll.h>
+#if defined(HAVE_POLL_H)
+#  include <poll.h>
+#else
+#  include <sys/poll.h>
+#endif
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <sys/un.h>
@@ -258,7 +262,8 @@ struct event_desc {
 #define OPT_RAPID_COMMIT   57
 #define OPT_UBUS           58
 #define OPT_IGNORE_CLID    59
-#define OPT_LAST           60
+#define OPT_SINGLE_PORT    60
+#define OPT_LAST           61
 
 #define OPTION_BITS (sizeof(unsigned int)*8)
 #define OPTION_SIZE ( (OPT_LAST/OPTION_BITS)+((OPT_LAST%OPTION_BITS)!=0) )
@@ -369,9 +374,11 @@ struct ds_config {
   struct ds_config *next;
 };
 
-#define ADDRLIST_LITERAL 1
-#define ADDRLIST_IPV6    2
-#define ADDRLIST_REVONLY 4
+#define ADDRLIST_LITERAL  1
+#define ADDRLIST_IPV6     2
+#define ADDRLIST_REVONLY  4
+#define ADDRLIST_PREFIX   8
+#define ADDRLIST_WILDCARD 16
 
 struct addrlist {
   union all_addr addr;
@@ -761,8 +768,9 @@ struct dhcp_config {
   unsigned char *clid;   /* clientid */
   char *hostname, *domain;
   struct dhcp_netid_list *netid;
+  struct dhcp_netid *filter;
 #ifdef HAVE_DHCP6
-  struct in6_addr addr6;
+  struct addrlist *addr6;
 #endif
   struct in_addr addr;
   time_t decline_time;
@@ -784,7 +792,6 @@ struct dhcp_config {
 #define CONFIG_DECLINED       1024    /* address declined by client */
 #define CONFIG_BANK           2048    /* from dhcp hosts file */
 #define CONFIG_ADDR6          4096
-#define CONFIG_WILDCARD       8192
 #define CONFIG_ADDR6_HOSTS   16384    /* address added by from /etc/hosts */
 
 struct dhcp_opt {
@@ -872,14 +879,6 @@ struct cond_domain {
   struct cond_domain *next;
 }; 
 
-#ifdef OPTION6_PREFIX_CLASS 
-struct prefix_class {
-  int class;
-  struct dhcp_netid tag;
-  struct prefix_class *next;
-};
-#endif
-
 struct ra_interface {
   char *name;
   char *mtu_name;
@@ -957,6 +956,8 @@ struct tftp_transfer {
   unsigned int block, blocksize, expansion;
   off_t offset;
   union mysockaddr peer;
+  union all_addr source;
+  int if_index;
   char opt_blocksize, opt_transize, netascii, carrylf;
   struct tftp_file *file;
   struct tftp_transfer *next;
@@ -1058,9 +1059,6 @@ extern struct daemon {
   int dump_mask;
   unsigned long soa_sn, soa_refresh, soa_retry, soa_expiry;
   u32 metrics[__METRIC_MAX];
-#ifdef OPTION6_PREFIX_CLASS 
-  struct prefix_class *prefix_classes;
-#endif
 #ifdef HAVE_DNSSEC
   struct ds_config *ds;
   char *timestamp_file;
@@ -1521,7 +1519,6 @@ void dhcp6_init(void);
 void dhcp6_packet(time_t now);
 struct dhcp_context *address6_allocate(struct dhcp_context *context,  unsigned char *clid, int clid_len, int temp_addr,
 				       unsigned int iaid, int serial, struct dhcp_netid *netids, int plain_range, struct in6_addr *ans);
-int config_valid(struct dhcp_config *config, struct dhcp_context *context, struct in6_addr *addr);
 struct dhcp_context *address6_available(struct dhcp_context *context, 
 					struct in6_addr *taddr,
 					struct dhcp_netid *netids,
@@ -1531,7 +1528,7 @@ struct dhcp_context *address6_valid(struct dhcp_context *context,
 				    struct dhcp_netid *netids,
 				    int plain_range);
 struct dhcp_config *config_find_by_address6(struct dhcp_config *configs, struct in6_addr *net, 
-					    int prefix, u64 addr);
+					    int prefix, struct in6_addr *addr);
 void make_duid(time_t now);
 void dhcp_construct_contexts(time_t now);
 void get_client_mac(struct in6_addr *client, int iface, unsigned char *mac, 
@@ -1568,7 +1565,8 @@ struct dhcp_config *find_config(struct dhcp_config *configs,
 				struct dhcp_context *context,
 				unsigned char *clid, int clid_len,
 				unsigned char *hwaddr, int hw_len, 
-				int hw_type, char *hostname);
+				int hw_type, char *hostname,
+				struct dhcp_netid *filter);
 int config_has_mac(struct dhcp_config *config, unsigned char *hwaddr, int len, int type);
 #ifdef HAVE_LINUX_NETWORK
 char *whichdevice(void);

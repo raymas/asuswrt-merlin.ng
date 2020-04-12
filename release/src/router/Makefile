@@ -1004,6 +1004,17 @@ obj-$(RTCONFIG_IPV6) += odhcp6c
 obj-$(RTCONFIG_6RELAYD) += 6relayd
 #obj-$(RTCONFIG_IPV6) += ecmh
 
+ifeq ($(RTCONFIG_WIREGUARD),y)
+export RTCONFIG_WIREGUARD := y
+else
+RTCONFIG_WIREGUARD :=
+endif
+obj-$(RTCONFIG_WIREGUARD) += wireguard-tools
+# for non HND router (kernel 2.6.x) use go userspace
+ifneq ($(HND_ROUTER),y)
+obj-$(RTCONFIG_WIREGUARD) += wireguard-go
+endif
+
 obj-$(RTCONFIG_MEDIA_SERVER) += zlib
 obj-$(RTCONFIG_MEDIA_SERVER) += sqlite
 obj-$(RTCONFIG_MEDIA_SERVER) += ffmpeg
@@ -3384,6 +3395,32 @@ odhcp6c-install: odhcp6c
 
 odhcp6c-clean:
 	-@$(MAKE) -C odhcp6c clean
+
+wireguard-tools: wireguard-tools/src/Makefile
+	@EXT_CFLAGS="-Os -Wall $(EXTRACFLAGS) -ffunction-sections -fdata-sections -fPIC" \
+	EXT_LDFLAGS="-ffunction-sections -fdata-sections -Wl,--gc-sections" \
+	PREFIX="/usr" \
+	$(MAKE) -C wireguard-tools/src
+
+wireguard-tools-install: wireguard-tools
+	install -D wireguard-tools/src/wg $(INSTALLDIR)/wireguard-tools/usr/sbin/wg
+	$(STRIP) $(INSTALLDIR)/wireguard-tools/usr/sbin/wg
+ 
+wireguard-tools-clean:
+	-@$(MAKE) -C wireguard-tools/src clean
+
+wireguard-go: wireguard-go/Makefile
+	@EXT_CFLAGS="-Os -Wall $(EXTRACFLAGS) -ffunction-sections -fdata-sections -fPIC" \
+	EXT_LDFLAGS="-ffunction-sections -fdata-sections -Wl,--gc-sections" \
+	PREFIX="/usr" \
+	$(MAKE) -C wireguard-go
+
+wireguard-go-install: wireguard-go
+	install -D wireguard-go/wireguard-go $(INSTALLDIR)/wireguard-go/usr/sbin/wireguard-go
+	$(STRIP) $(INSTALLDIR)/wireguard-go/usr/sbin/wireguard-go
+
+wireguard-go-clean:
+	-@$(MAKE) -C wireguard-go clean
 
 6relayd: 6relayd/Makefile
 	@EXT_CFLAGS="-Os -Wall $(EXTRACFLAGS) -ffunction-sections -fdata-sections -fPIC" \

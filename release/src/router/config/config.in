@@ -223,6 +223,10 @@ config RTCONFIG_IPSEC_CLIENT
 	depends on RTCONFIG_IPSEC
 	default n
 
+config RTCONFIG_WIREGUARD
+	bool "Wireguard"
+	default n
+
 # !!TB
 config RTCONFIG_IPV6
 	bool "IPv6 Support"

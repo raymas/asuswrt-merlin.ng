@@ -41,6 +41,7 @@ RTCONFIG_DDNS=y
 # RTCONFIG_L7 is not set
 # RTCONFIG_L7 is not set
 # RTCONFIG_IPV6 is not set
+# RTCONFIG_WIREGUARD is not set
 # RTCONFIG_EBTABLES is not set
 # RTCONFIG_EMF is not set
 # RTCONFIG_BCMBSD is not set

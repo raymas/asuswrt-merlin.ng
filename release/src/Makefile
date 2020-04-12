@@ -258,6 +258,10 @@ define RouterOptions
 		sed -i "/RTCONFIG_APP_PREINSTALLED/d" $(1); \
 		echo "# RTCONFIG_APP_PREINSTALLED is not set" >>$(1); \
 	fi; \
+	if [ "$(WIREGUARD)" = "y" ]; then \
+		sed -i "/RTCONFIG_WIREGUARD/d" $(1); \
+		echo "RTCONFIG_WIREGUARD=y" >>$(1); \
+	fi; \
 	)
 endef
 

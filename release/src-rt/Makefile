@@ -2649,6 +2649,12 @@ define RouterOptions
 		sed -i "/RTCONFIG_ETHOBD/d" $(1); \
 		echo "RTCONFIG_ETHOBD=y" >>$(1); \
 	fi; \
+	if [ "$(WIREGUARD)" = "y" ]; then \
+		sed -i "/RTCONFIG_WIREGUARD/d" $(1); \
+		echo "RTCONFIG_WIREGUARD=y" >>$(1); \
+		sed -i "/CONFIG_TUN/d" $(1); \
+		echo "CONFIG_TUN=m" >>$(1); \
+	fi; \
 	)
 	$(call platformRouterOptions, $(1))
 endef
@@ -4306,4 +4312,3 @@ get_extendno:
 .PHONY: a b c d m Makefile allversions
 .PHONY: tags
 .PHONY: dummy
-

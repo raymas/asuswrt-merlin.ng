@@ -2,15 +2,21 @@
 
 Fork of [RMerl/asuswrt-merlin.ng](https://github.com/RMerl/asuswrt-merlin.ng)
 
-With custom options available for dhcp.
-
 ## Custom builds (raymas)
 
-This fork aims to upgrade some packages for full compatibility with all ISP.
+Wireguard implementation for asuswrt-merlin work in progress
 
 ## Edited packages
 
-- odhcp6c : for ipv6 custom options support, merge of openwrt's trunk version.
+Most of supported routers are using kernel 2.6. Since the wireguard kernel implementation requires 3.10 and higher, we must use the wireguard-go userspace.
+
+For HND hardwares which are using kernel 4.1.27, we should be able to use the kernel module.
+
+
+## Status
+
+- [X] Non HND devices : done
+- [ ] HND devices : work in progress
 
 ## Supported devices
 

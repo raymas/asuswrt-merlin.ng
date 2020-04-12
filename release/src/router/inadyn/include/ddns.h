@@ -52,7 +52,7 @@
 #define DDNS_DEFAULT_ITERATIONS           0       /* Forever */
 #define DDNS_HTTP_RESPONSE_BUFFER_SIZE    BUFSIZ  /* 8 kiB */
 #define DDNS_HTTP_REQUEST_BUFFER_SIZE     2500    /* Bytes */
-#define DDNS_MAX_ALIAS_NUMBER             50      /* maximum number of aliases per server that can be maintained */
+#define DDNS_MAX_ALIAS_NUMBER             10      /* maximum number of aliases per server that can be maintained */
 #define DDNS_MAX_SERVER_NUMBER            5       /* maximum number of servers that can be maintained */
 
 /* SSL support status in plugin definition */
@@ -61,8 +61,8 @@
 #define DDNS_CHECKIP_SSL_REQUIRED         3       /* HTTPS required for checkip-server */
 
 /* local configs */
-#define USERNAME_LEN                      128     /* chars */
-#define PASSWORD_LEN                      256     /* chars */
+#define USERNAME_LEN                      50      /* chars */
+#define PASSWORD_LEN                      50      /* chars */
 #define SERVER_NAME_LEN                   256     /* chars */
 #define SERVER_URL_LEN                    256     /* chars */
 #ifdef INET6_ADDRSTRLEN

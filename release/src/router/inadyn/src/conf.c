@@ -123,11 +123,6 @@ static int validate_hostname(cfg_t *cfg, const char *provider, cfg_opt_t *hostna
 		}
 	}
 
-	if (i >= DDNS_MAX_ALIAS_NUMBER) {
-		cfg_error(cfg, "Too many hostname aliases, MAX %d supported!", DDNS_MAX_ALIAS_NUMBER);
-		return -1;
-	}
-
 	return 0;
 }
 
@@ -254,7 +249,7 @@ static int parseproxy(const char *proxy, tcp_proxy_type_t *type, ddns_name_t *na
 				*type = PROXY_SOCKS4;
 			else {
 				len = tmp - str;
-				protocol = malloc(len + 2);
+				protocol = malloc(len + 1);
 				strncpy(protocol, str, len);
 				protocol[len + 1] = 0;
 				logit(LOG_ERR, "Unsupported proxy protocol '%s'.", protocol);
@@ -355,11 +350,6 @@ static int set_provider_opts(cfg_t *cfg, ddns_info_t *info, int custom)
 		str = cfg_getnstr(cfg, "hostname", j);
 		if (!str)
 			continue;
-
-		if (info->alias_count == DDNS_MAX_ALIAS_NUMBER) {
-			logit(LOG_WARNING, "Too many hostname aliases, skipping %s ...", str);
-			continue;
-		}
 
 		strlcpy(info->alias[pos].name, str, sizeof(info->alias[pos].name));
 		info->alias_count++;

@@ -31,11 +31,10 @@
  * once it has read the IP and the modification time.
  */
 
-#include <time.h>
-#include <unistd.h>
-#include <netinet/in.h>
 #include <resolv.h>
 #include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
 
 #include "ddns.h"
 #include "cache.h"
@@ -155,7 +154,7 @@ int read_cache_file(ddns_t *ctx)
 
 		/* Exceptions -- no name to lookup */
 		for (i = 0; i < NELEMS(except); i++) {
-			if (!strncmp(name, except[i], strlen(name))) {
+			if (!strncmp(name, except[i], sizeof(name))) {
 				nonslookup = 1;
 				break;
 			}

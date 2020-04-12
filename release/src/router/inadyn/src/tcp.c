@@ -20,19 +20,18 @@
  * Boston, MA 02110-1301, USA.
  */
 
+#include <arpa/nameser.h>
 #include <errno.h>
+#include <net/if.h>
+#include <netinet/in.h>
 #include <poll.h>
+#include <resolv.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/nameser.h>
-#include <net/if.h>
-#include <netinet/in.h>
-#include <resolv.h>
 
 #include "log.h"
 #include "tcp.h"
@@ -152,6 +151,10 @@ int tcp_init(tcp_sock_t *tcp, char *msg)
 				break;
 			}
 
+			set_timeouts(sd, tcp->timeout);
+			tcp->socket = sd;
+			tcp->initialized = 1;
+
 			/* Now we try connecting to the server, on connect fail, try next DNS record */
 			sa  = ai->ai_addr;
 			len = ai->ai_addrlen;
@@ -159,14 +162,14 @@ int tcp_init(tcp_sock_t *tcp, char *msg)
 			if (getnameinfo(sa, len, host, sizeof(host), NULL, 0, NI_NUMERICHOST))
 				goto next;
 
-			set_timeouts(sd, tcp->timeout);
-
 			logit(LOG_INFO, "%s, %sconnecting to %s([%s]:%d)", msg, tries ? "re" : "",
 			      tcp->remote_host, host, tcp->port);
-			if (connect(sd, sa, len) && check_error(sd, tcp->timeout)) {
-			next:
+			if (connect(sd, sa, len)) {
 				tries++;
 
+				if (!check_error(sd, tcp->timeout))
+					break; /* OK */
+			next:
 				ai = ai->ai_next;
 				if (ai) {
 					logit(LOG_INFO, "Failed connecting to that server: %s",
@@ -178,9 +181,6 @@ int tcp_init(tcp_sock_t *tcp, char *msg)
 
 				logit(LOG_WARNING, "Failed connecting to %s: %s", tcp->remote_host, strerror(errno));
 				rc = RC_TCP_CONNECT_FAILED;
-			} else {
-				tcp->socket = sd;
-				tcp->initialized = 1;
 			}
 
 			break;

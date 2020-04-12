@@ -73,7 +73,7 @@ static int request(ddns_t *ctx, ddns_info_t *info, ddns_alias_t *alias)
 		tmp = strchr(alias->name, '.');
 		if (tmp) {
 			if (tmp[1] != 0 && strchr(tmp + 1, '.') != NULL) {
-				strlcpy(domain, tmp + 1, sizeof(domain));
+				strcpy(domain, tmp + 1);
 				strncpy(prefix, alias->name, tmp - alias->name);
 				prefix[tmp - alias->name] = 0;
 			} else {

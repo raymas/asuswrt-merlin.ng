@@ -3560,6 +3560,7 @@ start_ddns(void)
 				fprintf(fp, "wildcard = true\n");
 
 			fprintf(fp, "}\n");
+
 #if 1
 			if (asus_ddns == 1)
 				fprintf(fp, "secure-ssl = false\n");

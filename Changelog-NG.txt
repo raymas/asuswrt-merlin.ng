@@ -6,9 +6,19 @@ Asuswrt-Merlin 384/NG Changelog
   - UPDATED: dnsmasq to 2.81-openssl (themiron)
   - UPDATED: openvpn to 2.4.9.
   - UPDATED: curl to 7.69.1.
+  - UPDATED: openssl-1.1 to 1.1.1g (themiron)
+  - UPDATED: nano to 4.9.2.
   - FIXED: RT-AC88U/RT-AC3100/RT-AC5300 could fail to upgrade
            from newer stock versions to Asuswrt-Merlin.
   - FIXED: Various webui issues with sorting DHCP reservations.
+
+
+384.13_7 (xx-xxx-xxxx)
+  This release is only available for the RT-AC87U and RT-AC3200.
+
+  - UPDATED: dnsmasq to 2.81-openssl (themiron)
+  - UPDATED: openvpn to 2.4.9.
+  - UPDATED: openssl-1.1 to 1.1.1g (themiron)
 
 
 384.16 (5-Apr-2020)

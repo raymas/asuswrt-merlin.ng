@@ -2550,6 +2550,9 @@ start_default_filter(int lanunit)
 #ifdef RTCONFIG_OPENVPN
 		":OVPN - [0:0]\n"
 #endif
+#ifdef RTCONFIG_WIREGUARD
+		":WG - [0:0]\n"
+#endif
 		":logaccept - [0:0]\n"
 		":logdrop - [0:0]\n");
 #ifdef RTCONFIG_PROTECTION_SERVER
@@ -3081,6 +3084,9 @@ filter_setting(char *wan_if, char *wan_ip, char *lan_if, char *lan_ip, char *log
 #ifdef RTCONFIG_OPENVPN
 	    ":OVPN - [0:0]\n"
 #endif
+#ifdef RTCONFIG_WIREGUARD
+			"WG - [0:0]\n"
+#endif
 #ifdef RTCONFIG_DNSFILTER
 	    ":DNSFILTER_DOT - [0:0]\n"
 #endif
@@ -3300,6 +3306,9 @@ TRACE_PT("writing Parental Control\n");
 		fprintf(fp, "-A INPUT -i %s -m state --state NEW -j %s\n", "lo", "ACCEPT");
 #ifdef RTCONFIG_OPENVPN
 		fprintf(fp, "-A INPUT -m state --state NEW -j OVPN\n");
+#endif
+#ifdef RTCONFIG_WIREGUARD
+		fprintf(fp, "-A INPUT -m state --state NEW -j WG\n");
 #endif
 #ifdef RTCONFIG_IPV6
 		if (ipv6_enabled()) {
@@ -3615,6 +3624,7 @@ TRACE_PT("writing Parental Control\n");
 #endif
 
 	fprintf(fp, "-A other2wan -i tun+ -j RETURN\n");	// Let OVPN traffic through
+	fprintf(fp, "-A other2wan -i wg+ -j RETURN\n");	// Let WG traffic through
 	fprintf(fp, "-A other2wan -j %s\n", logdrop);		// Drop other foreign traffic
 
 // oleg patch ~
@@ -3986,6 +3996,9 @@ TRACE_PT("write wl filter\n");
 #ifdef RTCONFIG_OPENVPN
 	fprintf(fp, "-A FORWARD -m state --state NEW -j OVPN\n");
 #endif
+#ifdef RTCONFIG_WIREGUARD
+	fprintf(fp, "-A FORWARD -m state --state NEW -j WG\n");
+#endif
 	/* SECURITY chain */
 	/* Skip DMZ */
 	if ((dstip = nvram_safe_get("dmz_ip")) && *dstip && inet_addr_(dstip))
@@ -4195,6 +4208,9 @@ filter_setting2(char *lan_if, char *lan_ip, char *logaccept, char *logdrop)
 	    ":ACCESS_RESTRICTION - [0:0]\n"
 #ifdef RTCONFIG_OPENVPN
 	    ":OVPN - [0:0]\n"
+#endif
+#ifdef RTCONFIG_WIREGUARD
+			":WG - [0:0]\n"
 #endif
 #ifdef RTCONFIG_DNSFILTER
 	   ":DNSFILTER_DOT - [0:0]\n"
@@ -4419,6 +4435,9 @@ TRACE_PT("writing Parental Control\n");
 		fprintf(fp, "-A INPUT -i %s -m state --state NEW -j %s\n", "lo", "ACCEPT");
 #ifdef RTCONFIG_OPENVPN
 		fprintf(fp, "-A INPUT -m state --state NEW -j OVPN\n");
+#endif
+#ifdef RTCONFIG_WIREGUARD
+		fprintf(fp, "-A INPUT -m state --state NEW -j WG\n");
 #endif
 #ifdef RTCONFIG_IPV6
 		if (ipv6_enabled()) {
@@ -4724,6 +4743,7 @@ TRACE_PT("writing Parental Control\n");
 			fprintf(fp, "-A FORWARD -o %s ! -i %s -j %s\n", wanx_if, lan_if, "other2wan");
 	}
 	fprintf(fp, "-A other2wan -i tun+ -j RETURN\n");	// Let OVPN traffic through
+	fprintf(fp, "-A other2wan -i wg+ -j RETURN\n");	// Let WG traffic through
 	fprintf(fp, "-A other2wan -j %s\n", logdrop);		// Drop other foreign traffic
 
 #ifdef RTCONFIG_TAGGED_BASED_VLAN
@@ -5172,6 +5192,9 @@ TRACE_PT("write wl filter\n");
 
 #ifdef RTCONFIG_OPENVPN
 	fprintf(fp, "-A FORWARD -m state --state NEW -j OVPN\n");
+#endif
+#ifdef RTCONFIG_WIREGUARD
+	fprintf(fp, "-A FORWARD -m state --state NEW -j WG\n");
 #endif
 
 	/* SECURITY chain */
@@ -6370,4 +6393,3 @@ void ipt_account(FILE *fp, char *interface) {
 }
 
 #endif
-

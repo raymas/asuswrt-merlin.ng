@@ -1,6 +1,114 @@
 Asuswrt-Merlin 384/NG Changelog
 ===============================
 
+384.19 (14-Aug-2020)
+  - NOTE: Due to flash partitioning changes done by Asus, it is
+          strongly recommended to make a backup of your JFFS
+          partition before upgrading the RT-AC86U, and restoring
+          that backup afterward.  If you run into issues,
+          reformat your JFFS partition and reboot.
+  - NOTE: The RT-AX56U build is not available for this release.
+
+  - NEW: Added support for static routes for PPTP/L2TP VPN
+         clients, on the Static Route page (themiron)
+  - NEW: Added notification when JFFS free space drops
+         below 3 MB.
+  - UPDATED: Merged GPL 384_9354 for AX models.
+  - UPDATED: Merged GPL 384_81992 for mainline models.
+  - UPDATED: Merged SDK + binary blobs 384_9354 for RT-AX58U.
+  - UPDATED: Merged SDK + binary blobs 384_9107 for RT_AX88U.
+  - UPDATED: Merged binary blobs + SDK 384_81981 for RT_AC5300.
+  - UPDATED: Merged binary blobs + SDK 384_81992 for RT-AC86U.
+  - UPDATED: Merged bwdpi components from 385_20630 firmware
+             image for RT-AC68U.
+  - UPDATED: dnsmasq to 2.82-openssl (themiron)
+  - CHANGED: Rewrote a large portion of the OpenVPN implementation,
+             to make the code easier to maintain.  The new libovpn
+             code is released under a GPL licence.  Functionality
+             should largely remain the same.
+  - CHANGED: Replaced updown-*.sh OpenVPN event handler scripts
+             with binary libovpn functions. The new code does
+             stricter validation of the configuration.
+  - CHANGED: Enabling Client Config Dir (ccd) for an OpenVPN
+             server in non-exclusive mode will no longer accept
+             duplicate common names (to prevent issues with
+             two clients trying to share the same settings).
+             If you need such an unusual setup, you should
+             enable "Username/Password auth only", which will
+             make the common name become the username.  Or
+             better, ensure that you have unique certificates
+             for all of your users.
+  - CHANGED: Removed the (undocumented) vpn_debug setting.  Debug
+             logging will now only come from OpenVPN itself
+             (configurable through the log verbosity setting).
+  - CHANGED: Improved mechanism for providing an available
+             mount point for addon API scripters (dave14305)
+  - CHANGED: Harmonized the various SSL certificate modes with
+             upstream.
+             0-None - will be self-generated
+             1-Imported - lets you upload your own (no longer
+                           self generated unless you don't
+                           upload one)
+            2-Let's Encrypt (unchanged)
+            Self-generated cert will be stored to /jffs/cert.tgz,
+            just like upstream.
+  - FIXED: Broken French webui on AX models (fixed with
+           Asus's GPL update)
+  - FIXED: Chacha20 wasn't prioritized for bcm675x models which
+           lacked AES acceleration (RT-AX56U and RT-AX58U)
+  - FIXED: ddns updates and OpenVPN instances might be launched
+           twice at boot time if the initial ntp clock sync
+           happened too fast.
+  - FIXED: Enforced DNS and tQoS fix would be lost when the
+           firewall gets restarted while an OpenVPN client
+           is running.
+  - FIXED: Various issues surrounding error state report
+           when an OpenVPN client failed to start properly.
+  - FIXED: WINS provided by an OpenVPN server weren't properly
+           used.
+  - FIXED: Some large DNS queries could fail when using DoT
+           (patch backported from upstream)
+
+
+384.18 (28-June-2020)
+  - NOTE: A number of changes for some models are not backward
+          compatible with previous versions.  Downgrading to
+          a previous release will require a factory default reset
+          afterward in many cases.
+  - UPDATED: Merged GPL 384_8563 for AX models.
+  - UPDATED: Merged GPL 384_81918 for mainline models.
+  - UPDATED: Merged SDK + binary blobs 384_81918 for RT-AC86U.
+  - UPDATED: Merged SDK + binary blobs 384_81902 for RT-AC5300.
+  - UPDATED: Merged SDK + binary blobs 385_20490 for RT-AC68U.
+  - UPDATED: Merged binary blobs 385_20490 for RT-AC3100.
+  - UPDATED: Merged binary blobs 384_81918 for RT-AC88U.
+  - UPDATED: Merged SDK + binary blobs 384_8563 for RT-AX58U.
+  - UPDATED: amtm to 3.1.7.
+  - UPDATED: Root certificate bundle to June 3rd 2020.
+  - UPDATED: OUI database used by the webui.
+  - UPDATED: Dropbear 2020.80 (themiron)
+  - UPDATED: nano to 4.9.3.
+  - CHANGED: Optimized OpenVPN routing policy storage (this change
+             is NOT backward compatible with previous firmwares)
+  - FIXED: ssh/scp client would fail to connect while negotiating
+           a chacha20 connection (themiron)
+
+
+
+384.13_10 (28-June-2020)
+  This release will most likely be the last release for the
+  RT-AC87U and RT-AC3200, due to limited upstream support.
+
+  - UPDATED: amtm to 3.1.7.
+  - UPDATED: Root certificate bundle to June 3rd 2020.
+  - UPDATED: OUI database used by the webui.
+  - UPDATED: Dropbear 2020.80 (themiron)
+  - UPDATED: Wireless driver from 382_52230 for RT-AC87U and
+             RT-AC3200 (should in theory address Kr00k)
+  - FIXED: ssh/scp client would fail to connect while negotiating
+           a chacha20 connection (themiron)
+
+
 384.17 (26-Apr-2020)
   Updating some models (like the RT-AC88U) from stock firmware
   3.0.0.4.384_81790 and newer will require a factory default reset

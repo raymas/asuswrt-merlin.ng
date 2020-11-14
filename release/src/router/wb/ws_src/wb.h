@@ -24,8 +24,7 @@
 			char *tmp = NULL; \
 			GET_JSON_STRING_FIELD_EX(json_obj, name, tmp); \
 			if (tmp) { \
-	            memset(dest, 0, sizeof(dest)); \
-	            my_memcpy(dest, tmp, sizeof(dest), strlen(tmp)); \
+				snprintf(dest, sizeof(dest), "%s", tmp); \
         	} \
 		}
 
@@ -65,7 +64,9 @@ typedef enum _WS_ID
 	e_keepalive,
 	e_pushsendmsg,
 	e_pnssendmsg,
-	e_iftttnotification
+	e_iftttnotification,
+	e_getuserticketbyrefresh,
+	e_psrsendmsg
 }WS_ID;
 
 typedef struct _WS_MANAGER{

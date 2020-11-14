@@ -1,12 +1,7 @@
 #!/bin/sh
 SECS=1262278080
 
-if [ -f /usr/sbin/openssl11 ]
-then
-	OPENSSL=/usr/sbin/openssl11
-else
-	OPENSSL=/usr/sbin/openssl
-fi
+OPENSSL=/usr/sbin/openssl
 
 cd /etc
 mkdir cfg_mnt
@@ -24,6 +19,20 @@ for CN in $NVCN; do
         echo "$I.commonName=CN" >> openssl.config
         echo "$I.commonName_value=$CN" >> openssl.config
         I=$(($I + 1))
+done
+
+# Required extension
+sed -i "/\[ v3_ca \]/aextendedKeyUsage = serverAuth" openssl.config
+
+# Start of SAN extensions
+sed -i "/\[ CA_default \]/acopy_extensions = copy" openssl.config
+sed -i "/\[ v3_req \]/asubjectAltName = @alt_names" openssl.config
+echo "[alt_names]" >> openssl.config
+
+I=1
+for CN in $NVCN; do
+	echo "DNS.$I = $CN" >> openssl.config
+	I=$(($I + 1))
 done
 
 # create the key and certificate request

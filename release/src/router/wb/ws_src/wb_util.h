@@ -5,6 +5,7 @@ int 	get_web_path_len(char* trans_type, char* server, char* append);
 char* 	get_webpath(const char* trans_type, const char* server, const char* append);
 void 	free_webpath(char* webpath);
 void 	free_append_data(char* append_data);
+
 char* make_str(const char *fmt,	...);
 
 const char* getservicearea_template = 
@@ -17,11 +18,14 @@ const char* login_template =
 "<login>\r\n"
 "<userid>%s</userid>\r\n"
 "<passwd>%s</passwd>\r\n"
+"<cusid>%s</cusid>\r\n"
+"<userticket>%s</userticket>\r\n"
 "<devicemd5mac>%s</devicemd5mac>\r\n"
 "<devicename>%s</devicename>\r\n"
 "<deviceservice>%s</deviceservice>\r\n"
 "<devicetype>%s</devicetype>\r\n"
 "<permission>%s</permission>\r\n"
+"<devicedesc>%s</devicedesc>\r\n"
 "</login>\r\n\r\n";
 
 const char* loginbyticket_template = 
@@ -128,6 +132,22 @@ const char* pns_sendmsg_template =
 "<todeviceid>%s</todeviceid>\r\n"
 "<message>%s</message>\r\n"
 "</pns_sendmsg>\r\n\r\n"
+;
+
+const char* getuserticketbyrefresh_template = 
+"<getuserticketbyrefresh>\r\n"
+"<cusid>%s</cusid>\r\n"
+"<userrefreshticket>%s</userrefreshticket>\r\n"
+"</getuserticketbyrefresh>\r\n\r\n"
+;
+
+const char* psr_sendmsg_template = 
+"<psr_sendmsg>\r\n"
+"<cusid>%s</cusid>\r\n"
+"<deviceid>%s</deviceid>\r\n"
+"<deviceticket>%s</deviceticket>\r\n"
+"<psr_payload>%s</psr_payload>\r\n"
+"</psr_sendmsg>\r\n\r\n"
 ;
 
 const char* ifttt_notification_template = 

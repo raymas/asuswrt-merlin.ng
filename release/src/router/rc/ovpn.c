@@ -5,43 +5,14 @@
  */
 
 #include "rc.h"
-#include <string.h>
 
-#if 0	// Replaced by rc/openvpn.c versions
-int ovpn_up_main(int argc, char **argv)
+int ovpn_route_up_main(int argc, char **argv)
 {
-	int unit;
-
-	if(argc < 2)
-		return -1;
-
-	unit = atoi(argv[1]);
-
-//	ovpn_up_handler(unit);
-
-	update_resolvconf();
+//	ovpn_route_up_handler();
 
 	return 0;
 }
 
-int ovpn_down_main(int argc, char **argv)
-{
-	int unit;
-
-	if(argc < 2)
-		return -1;
-
-	unit = atoi(argv[1]);
-
-//	ovpn_down_handler(unit);
-
-	update_resolvconf();
-
-	return 0;
-}
-#endif
-
-#ifdef RTCONFIG_OPENVPN
 void create_ovpn_passwd()
 {
 	FILE *fps, *fpp;
@@ -80,7 +51,7 @@ void create_ovpn_passwd()
 				continue;
 #ifdef RTCONFIG_NVRAM_ENCRYPT
 			memset(dec_passwd, 0, sizeof(dec_passwd));
-			pw_dec(passwd, dec_passwd);
+			pw_dec(passwd, dec_passwd, sizeof(dec_passwd));
 			passwd = dec_passwd;
 #endif
 			p = crypt(passwd, salt);
@@ -100,5 +71,4 @@ error:
 	chmod("/etc/shadow.openvpn", 0600);
 	chmod("/etc/passwd.openvpn", 0644);
 }
-#endif
 

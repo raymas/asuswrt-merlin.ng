@@ -9,6 +9,10 @@
 #include <PMS_DBAPIs.h>
 #endif
 
+#ifdef RTCONFIG_PC_SCHED_V3
+#include <sched_v2.h>
+#endif
+
 //#define BLOCKLOCAL
 char *datestr[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
@@ -36,6 +40,9 @@ pc_event_s *initial_event(pc_event_s **target_e){
 	tmp_e = *target_e;
 
 	memset(tmp_e->e_name, 0, 32);
+#ifdef RTCONFIG_PC_SCHED_V3
+	tmp_e->day_of_week = 0;
+#endif
 	tmp_e->start_day = 0;
 	tmp_e->end_day = 0;
 	tmp_e->start_hour = 0;
@@ -154,6 +161,9 @@ pc_event_s *cp_event(pc_event_s **dest, const pc_event_s *src){
 	}
 
 	strlcpy((*dest)->e_name, src->e_name, sizeof((*dest)->e_name));
+#ifdef RTCONFIG_PC_SCHED_V3
+	(*dest)->day_of_week = src->day_of_week;
+#endif
 	(*dest)->start_day = src->start_day;
 	(*dest)->end_day = src->end_day;
 	(*dest)->start_hour = src->start_hour;
@@ -196,6 +206,9 @@ pc_s *initial_pc(pc_s **target_pc){
 	tmp_pc = *target_pc;
 
 	tmp_pc->enabled = 0;
+	tmp_pc->state = INITIAL;
+	tmp_pc->prev_state = INITIAL;
+	tmp_pc->dtimes = nvram_get_int("questcf")?:0;
 	memset(tmp_pc->device, 0, 32);
 	memset(tmp_pc->mac, 0, 18);
 	tmp_pc->events = NULL;
@@ -246,6 +259,72 @@ pc_s *cp_pc(pc_s **dest, const pc_s *src){
 	return *dest;
 }
 
+#ifdef RTCONFIG_PC_SCHED_V3
+char *get_pc_date_str(int day_of_week, int over_one_day, char *buf, int buf_size) {
+	char *datestr[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+	int i = 0;
+	if (!buf || buf_size < 35)
+		return NULL;
+
+	//SCHED_DBG("dow=%d, ood=%d", day_of_week, over_one_day);
+
+	memset(buf, 0, buf_size);
+	for (i = 0; i < 7; i++) {
+		if ((day_of_week & (1 << i)) > 0) {
+			if (!over_one_day)
+				snprintf(buf + strlen(buf), buf_size - strlen(buf), "%s,", datestr[i]);
+			else {
+				int o = i+1;
+				if (o >= 7)
+					o = 0;
+				snprintf(buf + strlen(buf), buf_size - strlen(buf), "%s,", datestr[o]);
+			}
+		}
+	}
+	if (strlen(buf) && buf[strlen(buf)-1] == ',')
+		buf[strlen(buf)-1] = '\0'; // strip the last char ','
+	return buf;
+}
+
+pc_event_s *get_event_list_by_sched_v2(pc_event_s **target_list, char *sched_v2_str) {
+	sched_v2_t *sched_v2_list;
+
+	if(target_list == NULL || sched_v2_str == NULL)
+		return NULL;
+
+	if (!parse_str_v2_to_sched_v2_list(sched_v2_str, &sched_v2_list, 1)) {
+		sched_v2_t *sched_v2;
+		//SCHED_DBG("now=%ld", now);
+		pc_event_s **follow_e_list = target_list;
+		for (sched_v2 = sched_v2_list; sched_v2 != NULL; sched_v2 = sched_v2->next) {
+			if(*follow_e_list == NULL && initial_event(follow_e_list) == NULL){
+				_dprintf("No memory!!(follow_e_list)\n");
+				continue;
+			}
+
+			/*SCHED_DBG("dow=%d, sh=%d, sm=%d, eh=%d, em=%d", 
+				sched_v2->value_w.day_of_week,
+				sched_v2->value_w.start_hour,
+				sched_v2->value_w.start_minute,
+				sched_v2->value_w.end_hour,
+				sched_v2->value_w.end_minute);*/
+			//get_event_day_limits(sched_v2, &(*follow_e_list)->start_day, &(*follow_e_list)->end_day);
+			(*follow_e_list)->day_of_week = sched_v2->value_w.day_of_week;
+			(*follow_e_list)->start_hour = sched_v2->value_w.start_hour;
+			(*follow_e_list)->end_hour = sched_v2->value_w.end_hour;
+			(*follow_e_list)->start_min = sched_v2->value_w.start_minute;
+			(*follow_e_list)->end_min = sched_v2->value_w.end_minute;
+
+			while(*follow_e_list != NULL)
+				follow_e_list = &((*follow_e_list)->next);
+		}
+		free_sched_v2_list(&sched_v2_list);
+		return *target_list;
+	} else
+		return *target_list;
+}
+#endif
+
 #ifdef RTCONFIG_PERMISSION_MANAGEMENT
 /*
 	permission management copy the origin rule into separate mac
@@ -277,6 +356,7 @@ pc_s *dup_pc_with_mac(pc_s **dest, const pc_s *src, const char *mac){
 #endif
 
 pc_s *get_all_pc_list(pc_s **pc_list){
+	int count;
 	char word[4096], *next_word;
 	pc_s *follow_pc, **follow_pc_list;
 	int i;
@@ -285,7 +365,7 @@ pc_s *get_all_pc_list(pc_s **pc_list){
 		return NULL;
 
 	follow_pc_list = pc_list;
-	foreach_62(word, nvram_safe_get("MULTIFILTER_ENABLE"), next_word){
+	foreach_62_keep_empty_string(count, word, nvram_safe_get("MULTIFILTER_ENABLE"), next_word){
 		if(initial_pc(follow_pc_list) == NULL){
 			_dprintf("No memory!!(follow_pc_list)\n");
 			continue;
@@ -293,6 +373,7 @@ pc_s *get_all_pc_list(pc_s **pc_list){
 
 		if(strlen(word) > 0)
 			(*follow_pc_list)->enabled = atoi(word);
+		_dprintf("get_all_pc_list, enabled_str=%s, enabled=%d.\n", word, (*follow_pc_list)->enabled);
 
 		while(*follow_pc_list != NULL)
 			follow_pc_list = &((*follow_pc_list)->next);
@@ -300,7 +381,7 @@ pc_s *get_all_pc_list(pc_s **pc_list){
 
 	follow_pc = *pc_list;
 	i = 0;
-	foreach_62(word, nvram_safe_get("MULTIFILTER_DEVICENAME"), next_word){
+	foreach_62_keep_empty_string(count, word, nvram_safe_get("MULTIFILTER_DEVICENAME"), next_word){
 		++i;
 		if(follow_pc == NULL){
 			_dprintf("*** %3dth Parental Control rule(DEVICENAME) had something wrong!\n", i);
@@ -314,7 +395,7 @@ pc_s *get_all_pc_list(pc_s **pc_list){
 
 	follow_pc = *pc_list;
 	i = 0;
-	foreach_62(word, nvram_safe_get("MULTIFILTER_MAC"), next_word){
+	foreach_62_keep_empty_string(count, word, nvram_safe_get("MULTIFILTER_MAC"), next_word){
 		++i;
 		if(follow_pc == NULL){
 			_dprintf("*** %3dth Parental Control rule(MAC) had something wrong!\n", i);
@@ -328,14 +409,22 @@ pc_s *get_all_pc_list(pc_s **pc_list){
 
 	follow_pc = *pc_list;
 	i = 0;
-	foreach_62(word, nvram_safe_get("MULTIFILTER_MACFILTER_DAYTIME"), next_word){
+#ifdef RTCONFIG_PC_SCHED_V3
+	foreach_62_keep_empty_string(count, word, nvram_safe_get("MULTIFILTER_MACFILTER_DAYTIME_V2"), next_word){
+#else
+	foreach_62_keep_empty_string(count, word, nvram_safe_get("MULTIFILTER_MACFILTER_DAYTIME"), next_word){
+#endif
 		++i;
 		if(follow_pc == NULL){
 			_dprintf("*** %3dth Parental Control rule(DAYTIME) had something wrong!\n", i);
 			return *pc_list;
 		}
 
+#ifdef RTCONFIG_PC_SCHED_V3
+		get_event_list_by_sched_v2(&(follow_pc->events), word);
+#else
 		get_event_list(&(follow_pc->events), word);
+#endif
 
 		follow_pc = follow_pc->next;
 	}
@@ -403,13 +492,33 @@ void print_pc_list(pc_s *pc_list){
 	}
 }
 
+#ifdef RTCONFIG_CONNTRACK
+void flush_pc_list(pc_s *pc_list){
+	pc_s *follow_pc;
+
+	if(pc_list == NULL)
+		return;
+
+	char tip[16];
+	for(follow_pc = pc_list; follow_pc != NULL; follow_pc = follow_pc->next){
+		if(follow_pc->enabled) {
+			memset(tip, 0, sizeof(tip));
+			if(arpcache(follow_pc->mac, tip)==0) {
+				_dprintf("\n[pc flush] clean conntracks of %s\n", tip);
+				eval("conntrack", "-D", "-s", tip);
+			}
+		}
+	}
+}
+#endif
+
 pc_s *match_enabled_pc_list(pc_s *pc_list, pc_s **target_list, int enabled){
 	pc_s *follow_pc, **follow_target_list;
 
 	if(pc_list == NULL || target_list == NULL)
 		return NULL;
 
-	if(enabled != 0 && enabled != 1)
+	if(enabled != 0 && enabled != 1 && enabled != 2)
 		return NULL;
 
 	follow_target_list = target_list;
@@ -452,6 +561,73 @@ pc_s *match_day_pc_list(pc_s *pc_list, pc_s **target_list, int target_day){
 	return *target_list;
 }
 
+#ifdef RTCONFIG_CONNTRACK
+int cleantrack_daytime_pc_list(pc_s *pc_list, int target_day, int target_hour, int verb){
+	pc_s *follow_pc;
+	pc_event_s *follow_e;
+	int target_num, com_start, com_end;
+	int fcf = nvram_get_int("forcedcf")? : 0;	/* force delete pclist conntracks */
+	
+	if(pc_list == NULL)
+		return -1;
+
+	if(target_day < MIN_DAY || target_day > MAX_DAY)
+		return -1;
+
+	if(target_hour < MIN_HOUR || target_hour > MAX_HOUR)
+		return -1;
+
+	target_num = target_day*24+target_hour;
+
+	for(follow_pc = pc_list; follow_pc != NULL; follow_pc = follow_pc->next){
+		if(!follow_pc->enabled)
+			continue;
+
+		follow_pc->prev_state = follow_pc->state;
+		for(follow_e = follow_pc->events; follow_e != NULL; follow_e = follow_e->next){
+			com_start = follow_e->start_day*24+follow_e->start_hour;
+			com_end = follow_e->end_day*24+follow_e->end_hour;
+
+			follow_pc->state = BLOCKED;
+			if(target_num >= com_start && target_num < com_end){ /* in allowed zone */
+				follow_pc->state = NONBLOCK;
+				follow_pc->dtimes = nvram_get_int("questcf")?:0;
+				break;
+			}
+		}
+		
+		if(verb) {
+			_dprintf("\nCHK [%s] pc pre/now state:[%d][%d], dtimes=%d, fcf=%d\n", follow_pc->mac, follow_pc->prev_state, follow_pc->state, follow_pc->dtimes, fcf);
+			_dprintf("now_day/hr:%d/%d\n", target_day, target_hour);
+		}
+		/* denial zone critical zone */
+		if(((follow_pc->prev_state==NONBLOCK||follow_pc->prev_state==INITIAL) && follow_pc->state==BLOCKED) ||
+		   (follow_pc->prev_state==DTIME) ||
+		   fcf ) {
+			char tip[16];
+			if(verb)
+				_dprintf("\n[pc] (%d)change to a denial zone [%s]\n", fcf, follow_pc->mac);
+			/* go clean denial-mac's conntracks */
+			if(arpcache(follow_pc->mac, tip)==0) {
+				_dprintf("\n[pc] delete conntracks of %s\n", tip);
+				eval("conntrack", "-D", "-s", tip);
+			}
+#ifdef HND_ROUTER
+			eval("fc", "flush");
+#elif defined(RTCONFIG_BCMARM)
+			/* TBD. ctf ipct entries cleanup. */
+#endif
+			if(follow_pc->dtimes-- > 0) 
+				follow_pc->state = DTIME;
+			else
+				follow_pc->state = BLOCKED;
+		}
+	}
+
+	return 0;
+}
+#endif
+
 pc_s *match_daytime_pc_list(pc_s *pc_list, pc_s **target_list, int target_day, int target_hour){
 	pc_s *follow_pc, **follow_target_list;
 	pc_event_s *follow_e;
@@ -488,11 +664,219 @@ pc_s *match_daytime_pc_list(pc_s *pc_list, pc_s **target_list, int target_day, i
 	return *target_list;
 }
 
+#ifdef RTCONFIG_PC_SCHED_V3
+// Parental Control:
+// MAC address not in list -> ACCEPT.
+// MAC address in list and in time period -> DROP.
+// MAC address in list and not in time period -> ACCEPT.
+void config_daytime_string(pc_s *pc_list, FILE *fp, char *logaccept, char *logdrop, int temp){
+
+	pc_s *enabled_list = NULL, *follow_pc;
+	pc_event_s *follow_e;
+	char date_buf[64];
+	char *lan_if = nvram_safe_get("lan_ifname");
+#ifdef BLOCKLOCAL
+	char *ftype;
+#endif
+	char *fftype;
+
+#ifdef BLOCKLOCAL
+	ftype = logaccept;
+#endif
+	fftype = "PControls";
+
+	follow_pc = match_enabled_pc_list(pc_list, &enabled_list, 1);
+	if(follow_pc == NULL){
+		_dprintf("Couldn't get the enabled rules of Parental-control correctly!\n");
+		return;
+	}
+
+	for(follow_pc = enabled_list; follow_pc != NULL; follow_pc = follow_pc->next){
+		const char *chk_type;
+		char follow_addr[18] = {0};
+#ifdef RTCONFIG_AMAS
+		_dprintf("config_daytime_string\n");
+		if (strlen(follow_pc->mac) && amas_lib_device_ip_query(follow_pc->mac, follow_addr)) {
+			chk_type = iptables_chk_ip;
+		} else
+#endif
+		{
+			chk_type = iptables_chk_mac;
+			snprintf(follow_addr, sizeof(follow_addr), "%s", follow_pc->mac);
+		}
+		//_dprintf("config_daytime_string mac=%s\n", follow_addr[0]);
+		if(!follow_addr[0])
+			chk_type = "";
+
+//_dprintf("[PC] mac=%s\n", follow_pc->mac);
+#ifdef RTCONFIG_PERMISSION_MANAGEMENT
+		if (!strcmp(follow_pc->mac, "")) continue;
+#endif
+
+		for(follow_e = follow_pc->events; follow_e != NULL; follow_e = follow_e->next){
+			int s_min = (follow_e->start_hour*60) + follow_e->start_min;
+			int e_min = (follow_e->end_hour*60) + follow_e->end_min;
+			if(s_min >= e_min){  // over one day
+#ifdef BLOCKLOCAL
+				if(!(follow_e->start_hour == 24 && follow_e->start_min == 0)) {
+					fprintf(fp, "-A INPUT -i %s -m time", lan_if);
+					if(follow_e->start_hour > 0 || follow_e->start_min > 0)
+						fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
+					fprintf(fp, "%s %s %s %s -j %s\n", DAYS_PARAM, get_pc_date_str(follow_e->day_of_week, 0, date_buf, sizeof(date_buf)), chk_type, follow_addr, ftype);
+				}
+#endif
+				if(!(follow_e->start_hour == 24 && follow_e->start_min == 0)) {
+					fprintf(fp, "-A FORWARD -i %s -m time", lan_if);
+					if(follow_e->start_hour > 0 || follow_e->start_min > 0)
+						fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
+					fprintf(fp, "%s %s %s %s -j %s\n", DAYS_PARAM, get_pc_date_str(follow_e->day_of_week, 0, date_buf, sizeof(date_buf)), chk_type, follow_addr, fftype);
+				}
+
+#ifdef BLOCKLOCAL
+				fprintf(fp, "-A INPUT -i %s -m time", lan_if);
+				if(!(follow_e->end_hour == 24 && follow_e->end_min == 0))
+					if(follow_e->end_hour > 0 || follow_e->end_min > 0)
+						fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
+				fprintf(fp, "%s %s %s %s -j %s\n", DAYS_PARAM, get_pc_date_str(follow_e->day_of_week, 1, date_buf, sizeof(date_buf)), chk_type, follow_addr, ftype);
+#endif
+				fprintf(fp, "-A FORWARD -i %s -m time", lan_if);
+				if(!(follow_e->end_hour == 24 && follow_e->end_min == 0))
+					if(follow_e->end_hour > 0 || follow_e->end_min > 0)
+						fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
+				fprintf(fp, "%s %s %s %s -j %s\n", DAYS_PARAM, get_pc_date_str(follow_e->day_of_week, 1, date_buf, sizeof(date_buf)), chk_type, follow_addr, fftype);
+			} else {
+#ifdef BLOCKLOCAL
+				fprintf(fp, "-A INPUT -i %s -m time", lan_if);
+				if(follow_e->start_hour > 0 || follow_e->start_min > 0)
+					fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
+				if(!(follow_e->end_hour == 24 && follow_e->end_min == 0))
+					if(follow_e->end_hour > 0 || follow_e->end_min > 0)
+						fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
+				fprintf(fp, "%s %s %s %s -j %s\n", DAYS_PARAM, get_pc_date_str(follow_e->day_of_week, 0, date_buf, sizeof(date_buf)), chk_type, follow_addr, ftype);
+#endif
+				fprintf(fp, "-A FORWARD -i %s -m time", lan_if);
+				if(follow_e->start_hour > 0 || follow_e->start_min > 0)
+					fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
+				if(!(follow_e->end_hour == 24 && follow_e->end_min == 0))
+					if(follow_e->end_hour > 0 || follow_e->end_min > 0)
+						fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
+				fprintf(fp, "%s %s %s %s -j %s\n", DAYS_PARAM, get_pc_date_str(follow_e->day_of_week, 0, date_buf, sizeof(date_buf)), chk_type, follow_addr, fftype);
+			}
+#if 0
+			if(follow_e->start_day != follow_e->end_day && follow_e->end_day == 0)
+				follow_e->end_day = 7;
+
+			if(follow_e->start_day == follow_e->end_day){
+				if(follow_e->start_hour == follow_e->end_hour && follow_e->start_min == follow_e->end_min){ // whole week.
+#ifdef BLOCKLOCAL
+					fprintf(fp, "-A FORWARD -i %s %s %s -j %s\n", lan_if, chk_type, follow_addr, ftype);
+#endif
+					fprintf(fp, "-A FORWARD -i %s %s %s -j %s\n", lan_if, chk_type, follow_addr, fftype);
+				}
+				else{
+#ifdef BLOCKLOCAL
+					fprintf(fp, "-A INPUT -i %s -m time", lan_if);
+					if(follow_e->start_hour > 0 || follow_e->start_min > 0)
+						fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
+#ifdef RTCONFIG_PC_SCHED_V3
+					if(!(follow_e->end_hour == 24 && follow_e->end_min == 0))
+#endif
+					if(follow_e->end_hour > 0 || follow_e->end_min > 0)
+						fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
+					fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->start_day], chk_type, follow_addr, ftype);
+#endif
+					fprintf(fp, "-A FORWARD -i %s -m time", lan_if);
+					if(follow_e->start_hour > 0 || follow_e->start_min > 0)
+						fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
+#ifdef RTCONFIG_PC_SCHED_V3
+					if(!(follow_e->end_hour == 24 && follow_e->end_min == 0))
+#endif
+					if(follow_e->end_hour > 0 || follow_e->end_min > 0)
+						fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
+					fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->start_day], chk_type, follow_addr, fftype);
+
+					if(follow_e->start_hour > follow_e->end_hour){
+#ifdef BLOCKLOCAL
+						fprintf(fp, "-A INPUT -i %s -m time" DAYS_PARAM, lan_if);
+						for(i = follow_e->start_day+1; i < follow_e->start_day+7; ++i)
+							fprintf(fp, "%s%s", (i == follow_e->start_day+1)?"":",", datestr[i%7]);
+						fprintf(fp, " %s %s -j %s\n", chk_type, follow_addr, ftype);
+#endif
+
+						fprintf(fp, "-A FORWARD -i %s -m time" DAYS_PARAM, lan_if);
+						for(i = follow_e->start_day+1; i < follow_e->start_day+7; ++i)
+							fprintf(fp, "%s%s", (i == follow_e->start_day+1)?"":",", datestr[i%7]);
+						fprintf(fp, " %s %s -j %s\n", chk_type, follow_addr, fftype);
+					}
+				}
+			}
+			else if(follow_e->start_day < follow_e->end_day){
+				// first interval.
+#ifdef BLOCKLOCAL
+				fprintf(fp, "-A INPUT -i %s -m time", lan_if);
+				if(follow_e->start_hour > 0 || follow_e->start_min > 0)
+					fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
+				fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->start_day], chk_type, follow_addr, ftype);
+#endif
+				fprintf(fp, "-A FORWARD -i %s -m time", lan_if);
+				if(follow_e->start_hour > 0 || follow_e->start_min > 0)
+					fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
+				fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->start_day], chk_type, follow_addr, fftype);
+
+				// middle interval.
+				if(follow_e->end_day-follow_e->start_day > 1){
+#ifdef BLOCKLOCAL
+					fprintf(fp, "-A INPUT -i %s -m time" DAYS_PARAM, lan_if);
+					for(i = follow_e->start_day+1; i < follow_e->end_day; ++i)
+						fprintf(fp, "%s%s", (i == follow_e->start_day+1)?"":",", datestr[i]);
+					fprintf(fp, " %s %s -j %s\n", chk_type, follow_addr, ftype);
+#endif
+
+					fprintf(fp, "-A FORWARD -i %s -m time" DAYS_PARAM, lan_if);
+					for(i = follow_e->start_day+1; i < follow_e->end_day; ++i)
+						fprintf(fp, "%s%s", (i == follow_e->start_day+1)?"":",", datestr[i]);
+					fprintf(fp, " %s %s -j %s\n", chk_type, follow_addr, fftype);
+				}
+
+				// end interval.
+#ifdef RTCONFIG_PC_SCHED_V3
+				if(!(follow_e->end_hour == 24 && follow_e->end_min == 0))
+#endif
+				if(follow_e->end_hour > 0 || follow_e->end_min > 0){
+#ifdef BLOCKLOCAL
+					fprintf(fp, "-A INPUT -i %s -m time", lan_if);
+
+					fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
+					fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->end_day], chk_type, follow_addr, ftype);
+#endif
+					fprintf(fp, "-A FORWARD -i %s -m time", lan_if);
+					fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
+					fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->end_day], chk_type, follow_addr, fftype);
+				}
+			}
+			else
+				; // Don't care "start_day > end_day".
+#endif
+		}
+
+		// MAC address in list and not in time period -> DROP.
+		if(!temp){
+#ifdef BLOCKLOCAL
+			fprintf(fp, "-A INPUT -i %s %s %s -j ACCEPT\n", lan_if, chk_type, follow_addr);
+#endif
+			fprintf(fp, "-A FORWARD -i %s %s %s -j ACCEPT\n", lan_if, chk_type, follow_addr);
+		}
+	}
+
+	free_pc_list(&enabled_list);
+}
+#else
 // Parental Control:
 // MAC address not in list -> ACCEPT.
 // MAC address in list and in time period -> ACCEPT.
 // MAC address in list and not in time period -> DROP.
 void config_daytime_string(pc_s *pc_list, FILE *fp, char *logaccept, char *logdrop, int temp){
+
 	pc_s *enabled_list = NULL, *follow_pc;
 	pc_event_s *follow_e;
 	char *lan_if = nvram_safe_get("lan_ifname");
@@ -514,9 +898,20 @@ void config_daytime_string(pc_s *pc_list, FILE *fp, char *logaccept, char *logdr
 	}
 
 	for(follow_pc = enabled_list; follow_pc != NULL; follow_pc = follow_pc->next){
-		const char *chk_mac = iptables_chk_mac;
-		if(!follow_pc->mac[0])
-			chk_mac = "";
+		const char *chk_type;
+		char follow_addr[18] = {0};
+#ifdef RTCONFIG_AMAS
+		_dprintf("config_daytime_string\n");
+		if (strlen(follow_pc->mac) && amas_lib_device_ip_query(follow_pc->mac, follow_addr)) {
+			chk_type = iptables_chk_ip;
+		} else
+#endif
+		{
+			chk_type = iptables_chk_mac;
+			snprintf(follow_addr, sizeof(follow_addr), "%s", follow_pc->mac);
+		}
+		if(!follow_addr[0])
+			chk_type = "";
 
 //_dprintf("[PC] mac=%s\n", follow_pc->mac);
 #ifdef RTCONFIG_PERMISSION_MANAGEMENT
@@ -530,9 +925,9 @@ void config_daytime_string(pc_s *pc_list, FILE *fp, char *logaccept, char *logdr
 			if(follow_e->start_day == follow_e->end_day){
 				if(follow_e->start_hour == follow_e->end_hour && follow_e->start_min == follow_e->end_min){ // whole week.
 #ifdef BLOCKLOCAL
-					fprintf(fp, "-A FORWARD -i %s %s %s -j %s\n", lan_if, chk_mac, follow_pc->mac, ftype);
+					fprintf(fp, "-A FORWARD -i %s %s %s -j %s\n", lan_if, chk_type, follow_addr, ftype);
 #endif
-					fprintf(fp, "-A FORWARD -i %s %s %s -j %s\n", lan_if, chk_mac, follow_pc->mac, fftype);
+					fprintf(fp, "-A FORWARD -i %s %s %s -j %s\n", lan_if, chk_type, follow_addr, fftype);
 				}
 				else{
 #ifdef BLOCKLOCAL
@@ -541,14 +936,28 @@ void config_daytime_string(pc_s *pc_list, FILE *fp, char *logaccept, char *logdr
 						fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
 					if(follow_e->end_hour > 0 || follow_e->end_min > 0)
 						fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
-					fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->start_day], chk_mac, follow_pc->mac, ftype);
+					fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->start_day], chk_type, follow_addr, ftype);
 #endif
 					fprintf(fp, "-A FORWARD -i %s -m time", lan_if);
 					if(follow_e->start_hour > 0 || follow_e->start_min > 0)
 						fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
 					if(follow_e->end_hour > 0 || follow_e->end_min > 0)
 						fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
-					fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->start_day], chk_mac, follow_pc->mac, fftype);
+					fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->start_day], chk_type, follow_addr, fftype);
+
+					if(follow_e->start_hour > follow_e->end_hour){
+#ifdef BLOCKLOCAL
+						fprintf(fp, "-A INPUT -i %s -m time" DAYS_PARAM, lan_if);
+						for(i = follow_e->start_day+1; i < follow_e->start_day+7; ++i)
+							fprintf(fp, "%s%s", (i == follow_e->start_day+1)?"":",", datestr[i%7]);
+						fprintf(fp, " %s %s -j %s\n", chk_type, follow_addr, ftype);
+#endif
+
+						fprintf(fp, "-A FORWARD -i %s -m time" DAYS_PARAM, lan_if);
+						for(i = follow_e->start_day+1; i < follow_e->start_day+7; ++i)
+							fprintf(fp, "%s%s", (i == follow_e->start_day+1)?"":",", datestr[i%7]);
+						fprintf(fp, " %s %s -j %s\n", chk_type, follow_addr, fftype);
+					}
 				}
 			}
 			else if(follow_e->start_day < follow_e->end_day){
@@ -557,12 +966,12 @@ void config_daytime_string(pc_s *pc_list, FILE *fp, char *logaccept, char *logdr
 				fprintf(fp, "-A INPUT -i %s -m time", lan_if);
 				if(follow_e->start_hour > 0 || follow_e->start_min > 0)
 					fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
-				fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->start_day], chk_mac, follow_pc->mac, ftype);
+				fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->start_day], chk_type, follow_addr, ftype);
 #endif
 				fprintf(fp, "-A FORWARD -i %s -m time", lan_if);
 				if(follow_e->start_hour > 0 || follow_e->start_min > 0)
 					fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
-				fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->start_day], chk_mac, follow_pc->mac, fftype);
+				fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->start_day], chk_type, follow_addr, fftype);
 
 				// middle interval.
 				if(follow_e->end_day-follow_e->start_day > 1){
@@ -570,13 +979,13 @@ void config_daytime_string(pc_s *pc_list, FILE *fp, char *logaccept, char *logdr
 					fprintf(fp, "-A INPUT -i %s -m time" DAYS_PARAM, lan_if);
 					for(i = follow_e->start_day+1; i < follow_e->end_day; ++i)
 						fprintf(fp, "%s%s", (i == follow_e->start_day+1)?"":",", datestr[i]);
-					fprintf(fp, " %s %s -j %s\n", chk_mac, follow_pc->mac, ftype);
+					fprintf(fp, " %s %s -j %s\n", chk_type, follow_addr, ftype);
 #endif
 
 					fprintf(fp, "-A FORWARD -i %s -m time" DAYS_PARAM, lan_if);
 					for(i = follow_e->start_day+1; i < follow_e->end_day; ++i)
 						fprintf(fp, "%s%s", (i == follow_e->start_day+1)?"":",", datestr[i]);
-					fprintf(fp, " %s %s -j %s\n", chk_mac, follow_pc->mac, fftype);
+					fprintf(fp, " %s %s -j %s\n", chk_type, follow_addr, fftype);
 				}
 
 				// end interval.
@@ -585,11 +994,11 @@ void config_daytime_string(pc_s *pc_list, FILE *fp, char *logaccept, char *logdr
 					fprintf(fp, "-A INPUT -i %s -m time", lan_if);
 
 					fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
-					fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->end_day], chk_mac, follow_pc->mac, ftype);
+					fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->end_day], chk_type, follow_addr, ftype);
 #endif
 					fprintf(fp, "-A FORWARD -i %s -m time", lan_if);
 					fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
-					fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->end_day], chk_mac, follow_pc->mac, fftype);
+					fprintf(fp, DAYS_PARAM "%s %s %s -j %s\n", datestr[follow_e->end_day], chk_type, follow_addr, fftype);
 				}
 			}
 			else
@@ -599,20 +1008,70 @@ void config_daytime_string(pc_s *pc_list, FILE *fp, char *logaccept, char *logdr
 		// MAC address in list and not in time period -> DROP.
 		if(!temp){
 #ifdef BLOCKLOCAL
-			fprintf(fp, "-A INPUT -i %s %s %s -j DROP\n", lan_if, chk_mac, follow_pc->mac);
+			fprintf(fp, "-A INPUT -i %s %s %s -j DROP\n", lan_if, chk_type, follow_addr);
 #endif
-			fprintf(fp, "-A FORWARD -i %s %s %s -j DROP\n", lan_if, chk_mac, follow_pc->mac);
+			fprintf(fp, "-A FORWARD -i %s %s %s -j DROP\n", lan_if, chk_type, follow_addr);
+		}
+	}
+
+	free_pc_list(&enabled_list);
+}
+#endif // #ifdef RTCONFIG_PC_SCHED_V3
+
+void config_pause_block_string(pc_s *pc_list, FILE *fp, char *logaccept, char *logdrop, int temp){
+
+	pc_s *enabled_list = NULL, *follow_pc;
+	char *lan_if = nvram_safe_get("lan_ifname");
+#ifdef BLOCKLOCAL
+	char *ftype;
+
+	ftype = logaccept;
+#endif
+
+	follow_pc = match_enabled_pc_list(pc_list, &enabled_list, 2);
+	if(follow_pc == NULL){
+		_dprintf("Couldn't get the pause rules of Parental-control correctly!\n");
+		return;
+	}
+
+	for(follow_pc = enabled_list; follow_pc != NULL; follow_pc = follow_pc->next){
+		//const char *chk_mac = iptables_chk_mac;
+		const char *chk_type;
+		char follow_addr[18] = {0};
+#ifdef RTCONFIG_AMAS
+		_dprintf("config_pause_block_string\n");
+		if (strlen(follow_pc->mac) && amas_lib_device_ip_query(follow_pc->mac, follow_addr)) {
+			chk_type = iptables_chk_ip;
+		} else
+#endif
+		{
+			chk_type = iptables_chk_mac;
+			snprintf(follow_addr, sizeof(follow_addr), "%s", follow_pc->mac);
+		}
+		if(!follow_pc->mac[0])
+			chk_type = "";
+
+//_dprintf("[PC] mac=%s\n", follow_pc->mac);
+#ifdef RTCONFIG_PERMISSION_MANAGEMENT
+		if (!strcmp(follow_pc->mac, "")) continue;
+#endif
+		// MAC address in list and not in time period -> DROP.
+		if(!temp){
+#ifdef BLOCKLOCAL
+			fprintf(fp, "-A INPUT -i %s %s %s -j DROP\n", lan_if, chk_type, follow_addr);
+#endif
+			fprintf(fp, "-A FORWARD -i %s %s %s -j DROP\n", lan_if, chk_type, follow_addr);
 		}
 	}
 
 	free_pc_list(&enabled_list);
 }
 
-int count_pc_rules(pc_s *pc_list){
+int count_pc_rules(pc_s *pc_list, int enabled){
 	pc_s *enabled_list = NULL, *follow_pc;
 	int count;
 
-	follow_pc = match_enabled_pc_list(pc_list, &enabled_list, 1);
+	follow_pc = match_enabled_pc_list(pc_list, &enabled_list, enabled);
 	if(follow_pc == NULL){
 		_dprintf("Couldn't get the enabled rules of Parental-control correctly!\n");
 		return 0;
@@ -635,7 +1094,7 @@ int pc_main(int argc, char *argv[]){
 		print_pc_list(pc_list);
 	}
 	else if((argc == 2 && !strcmp(argv[1], "enabled"))
-			|| (argc == 3 && !strcmp(argv[1], "enabled") && (!strcmp(argv[2], "0") || !strcmp(argv[2], "1")))){
+			|| (argc == 3 && !strcmp(argv[1], "enabled") && (!strcmp(argv[2], "0") || !strcmp(argv[2], "1") || !strcmp(argv[2], "2")))){
 		if(argc == 2)
 			match_enabled_pc_list(pc_list, &enabled_list, 1);
 		else
@@ -656,12 +1115,7 @@ int pc_main(int argc, char *argv[]){
 		free_pc_list(&daytime_list);
 	}
 	else if(argc == 2 && !strcmp(argv[1], "apply")){
-		char prefix[]="wanXXXXXX_", tmp[100];
 		int wan_unit = wan_primary_ifunit();
-		snprintf(prefix, sizeof(prefix), "wan%d_", wan_unit);
-
-		char *wan_if = get_wan_ifname(wan_unit);
-		char *wan_ip = nvram_safe_get(strcat_r(prefix, "ipaddr", tmp));
 		char *lan_if = nvram_safe_get("lan_ifname");
 		char *lan_ip = nvram_safe_get("lan_ipaddr");
 		char logaccept[32], logdrop[32];
@@ -677,19 +1131,27 @@ int pc_main(int argc, char *argv[]){
 
 		match_enabled_pc_list(pc_list, &enabled_list, 1);
 
-		filter_setting(wan_if, wan_ip, lan_if, lan_ip, logaccept, logdrop);
+		filter_setting(wan_unit, lan_if, lan_ip, logaccept, logdrop);
 
 		free_pc_list(&enabled_list);
 	}
 	else if(argc == 2 && !strcmp(argv[1], "showrules")){
 		config_daytime_string(pc_list, stderr, "ACCEPT", "logdrop", 0);
 	}
+#ifdef RTCONFIG_CONNTRACK
+	else if(argc == 2 && !strcmp(argv[1], "flush")){
+		flush_pc_list(pc_list);
+	}
+#endif
 	else{
 		printf("Usage: pc [show]\n"
 		       "          showrules\n"
 		       "          enabled [1 | 0]\n"
 		       "          daytime [1-7] [0-23]\n"
 		       "          apply\n"
+#ifdef RTCONFIG_CONNTRACK
+		       "          flush\n"
+#endif
 		       );
 	}
 

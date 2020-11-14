@@ -65,6 +65,7 @@ bcmImageBuilder: bcmImageBuilder.c
 	$(CC) $(CFLAGS) -o bcmImageBuilder bcmImageBuilder.c
 version:
 	cp -f ../router/shared/version.h .
+	cp -f ../router/shared/rtconfig.h .
 ifneq ($(wildcard ./prebuilt/addvtoken),)
 addvtoken:
 	@-cp -f ./prebuilt/addvtoken .
@@ -124,7 +125,7 @@ mklzma_cmd: untar_lzma457
 config_xz-5.0.3:
 	if [ ! -e xz-5.0.3 ]; then \
 	echo Untarring xz-5.0.3 source...; \
-	(tar xkfj xz-5.0.3.tar.bz2 2> /dev/null || true); \
+	(tar xkjf xz-5.0.3.tar.bz2 2> /dev/null || true); \
 	fi 
 	if [ ! -e xz-5.0.3/Makefile ]; then \
 	(cd xz-5.0.3; ./configure --enable-shared=no --disable-assembler) ;\

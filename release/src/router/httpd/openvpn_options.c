@@ -421,8 +421,6 @@ add_option (char *p[], int line, int unit)
 
 		if(p[2])
 			nvram_pf_set(prefix, "port", p[2]);
-		else
-			nvram_pf_set(prefix, "port", "1194");
 		if(p[3])
 		{
 			if(!strncmp(p[3], "tcp", 3))
@@ -446,12 +444,29 @@ add_option (char *p[], int line, int unit)
 		else
 			nvram_pf_set(prefix, "comp", "adaptive");
 	}
+	else if (streq (p[0], "compress"))
+	{
+		if (p[1]) {
+			if (streq (p[1], "lzo"))
+				nvram_pf_set(prefix, "comp", "yes");
+			else if (streq (p[1], "lz4"))
+				nvram_pf_set(prefix, "comp", "lz4");
+			else if (streq (p[1], "lz4-v2"))
+				nvram_pf_set(prefix, "comp", "lz4-v2");
+			else if (streq (p[1], "stub"))
+				nvram_pf_set(prefix, "comp", "stub");
+                        else if (streq (p[1], "stub-v2"))
+                                nvram_pf_set(prefix, "comp", "stub-v2");
+		} else {
+			nvram_pf_set(prefix, "comp", "no");
+		}
+	}
+#if 0
 	else if (streq (p[0], "cipher") && p[1])
 	{
 		nvram_pf_set(prefix, "cipher", p[1]);
-		if (nvram_pf_get_int(prefix, "ncp_enable") == 2)
-			nvram_pf_set(prefix, "ncp_enable", "1");	// Ensure legacy cipher is allowed
 	}
+#endif
 	else if (streq (p[0], "auth") && p[1])
 	{
 		nvram_pf_set(prefix, "digest", p[1]);
@@ -481,6 +496,17 @@ add_option (char *p[], int line, int unit)
 		else
 		{
 			return VPN_UPLOAD_NEED_CERT;
+		}
+	}
+	else if (streq (p[0], "extra-certs") && p[1])
+	{
+		if (streq (p[1], INLINE_FILE_TAG) && p[2] && strstr(p[2], PEM_START_TAG))
+		{
+			set_ovpn_key(OVPN_TYPE_CLIENT, unit, OVPN_CLIENT_EXTRA, p[2], NULL);
+		}
+		else
+		{
+			return VPN_UPLOAD_NEED_EXTRA;
 		}
 	}
 	else if  (streq (p[0], "key") && p[1])
@@ -528,6 +554,22 @@ add_option (char *p[], int line, int unit)
 			return VPN_UPLOAD_NEED_STATIC;
 		}
 	}
+	else if (streq (p[0], "tls-crypt-v2") && p[1])
+	{
+		if (streq (p[1], INLINE_FILE_TAG) && p[2] && strstr(p[2], PEM_START_TAG))
+		{
+			set_ovpn_key(OVPN_TYPE_CLIENT, unit, OVPN_CLIENT_STATIC, p[2], NULL);
+			if(nvram_pf_match(prefix, "hmac", "-1"))	//default, disable
+				nvram_pf_set(prefix, "hmac", "4");	//Enable tls-crypt-v2
+		}
+		else
+		{
+			if(p[2]) {
+				nvram_pf_set(prefix, "hmac", 4);
+			}
+			return VPN_UPLOAD_NEED_STATIC;
+		}
+	}
 	else if (streq (p[0], "secret") && p[1])
 	{
 		nvram_pf_set(prefix, "crypt", "secret");
@@ -540,17 +582,6 @@ add_option (char *p[], int line, int unit)
 			return VPN_UPLOAD_NEED_STATIC;
 		}
 	}
-	else if (streq (p[0], "extra-certs") && p[1])
-	{
-		if (streq (p[1], INLINE_FILE_TAG) && p[2] && strstr(p[2], PEM_START_TAG))
-		{
-			set_ovpn_key(OVPN_TYPE_CLIENT, unit, OVPN_CLIENT_CA_EXTRA, p[2], NULL);
-		}
-		else
-		{
-			return VPN_UPLOAD_NEED_EXTRA;
-		}
-	}
 	else if (streq (p[0], "auth-user-pass"))
 	{
 		nvram_pf_set(prefix, "userauth", "1");
@@ -558,6 +589,16 @@ add_option (char *p[], int line, int unit)
 	else if (streq (p[0], "tls-remote") && p[1])
 	{
 		nvram_pf_set(prefix, "tlsremote", "1");
+		nvram_pf_set(prefix, "cn", p[1]);
+	}
+	else if (streq (p[0], "verify-x509-name") && p[1] && p[2])
+	{
+		if (streq(p[2], "name"))
+			nvram_pf_set(prefix, "tlsremote", "1");
+		else if (streq(p[2], "name-prefix"))
+			nvram_pf_set(prefix, "tlsremote", "2");
+		else if (streq(p[2], "subject"))
+			nvram_pf_set(prefix, "tlsremote", "3");
 		nvram_pf_set(prefix, "cn", p[1]);
 	}
 	else if (streq (p[0], "key-direction") && p[1])
@@ -587,28 +628,9 @@ add_option (char *p[], int line, int unit)
 			return VPN_UPLOAD_NEED_CRL;
 		}
 	}
-	else if (streq (p[0], "compress"))
-	{
-		if (p[1]) {
-			if (streq (p[1], "lzo"))
-				nvram_pf_set(prefix, "comp", "yes");
-			else if (streq (p[1], "lz4"))
-				nvram_pf_set(prefix, "comp", "lz4");
-			else if (streq (p[1], "lz4-v2"))
-				nvram_pf_set(prefix, "comp", "lz4-v2");
-		} else {
-			nvram_pf_set(prefix, "comp", "no");
-		}
-	}
 	else if (streq (p[0], "ncp-ciphers") && p[1])
 	{
 		nvram_pf_set(prefix, "ncp_ciphers", p[1]);
-		if (nvram_pf_get_int(prefix, "ncp_enable") == 0)
-			nvram_pf_set(prefix, "ncp_enable", "1");    // Ensure ncp is not disabled
-	}
-	else if (streq (p[0], "ncp-disable"))
-	{
-		nvram_pf_set(prefix, "ncp_enable", "0");
 	}
 	else if (streq (p[0], "redirect-gateway") && (!p[1] || streq (p[1], "def1")))	// Only handle if default GW
 	{
@@ -683,17 +705,18 @@ read_config_file (const char *file, int unit)
 }
 
 
-void parse_openvpn_status(int unit){
+void parse_openvpn_status(int unit)
+{
 	FILE *fpi, *fpo;
 	char buf[512];
 	char *token;
 	char nv_name[32] = "";
 	char prefix_vpn[] = "vpn_serverXX_";
 
-	sprintf(buf, "/etc/openvpn/server%d/status", unit);
+	snprintf(buf, sizeof(buf), "/etc/openvpn/server%d/status", unit);
 	fpi = fopen(buf, "r");
 
-	sprintf(buf, "/etc/openvpn/server%d/client_status", unit);
+	snprintf(buf, sizeof(buf), "/etc/openvpn/server%d/client_status", unit);
 	fpo = fopen(buf, "w");
 
 	snprintf(prefix_vpn, sizeof(prefix_vpn), "vpn_server%d_", unit);
@@ -729,12 +752,27 @@ void parse_openvpn_status(int unit){
 				token = strtok(NULL, ",");	//Bytes Sent
 				token = strtok(NULL, ",");	//Connected Since
 				token = strtok(NULL, ",");	//Connected Since (time_t)
-				token = strtok(NULL, ",");	//Username, include'\n'
+				token = strtok(NULL, ",");	//Username
 				if(token)
 					fprintf(fpo, "%s\n", token);
 				else
 					fprintf(fpo, "NoUsername\n");
+				fprintf(fpo, "\n");
 			}
+#if 0
+			else if(!strncmp(buf, "REMOTE", 6)) {
+				token = strtok(buf, ",");       //REMOTE,
+				token = strtok(NULL, ",");      //Real Address
+				if(token)
+					fprintf(fpo, "%s ", token);
+				else
+					fprintf(fpo, "NoRealAddress ");
+
+				fprintf(fpo, "%s ", conf.remote);
+				fprintf(fpo, "Static_Key");
+				break;
+			}
+#endif
 		}
 	}
 	if(fpi) fclose(fpi);

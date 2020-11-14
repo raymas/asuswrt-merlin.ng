@@ -9,9 +9,11 @@ void config_blocking_redirect(FILE *fp){
 	char *lan_if = nvram_safe_get("lan_ifname");
 	char *lan_ip = nvram_safe_get("lan_ipaddr");
 	char *lan_mask = nvram_safe_get("lan_netmask");
+#ifndef RTCONFIG_PC_SCHED_V3
 	char *datestr[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-	char *fftype;
 	int i;
+#endif
+	char *fftype;
 
 	fftype = "PCREDIRECT";
 
@@ -29,46 +31,92 @@ void config_blocking_redirect(FILE *fp){
 	}
 
 	for(follow_pc = enabled_list; follow_pc != NULL; follow_pc = follow_pc->next){
-		const char *chk_mac = iptables_chk_mac;
+		const char *chk_type;
+		char follow_addr[18] = {0};
+#ifdef RTCONFIG_AMAS
+		_dprintf("config_blocking_redirect\n");
+		if (strlen(follow_pc->mac) && amas_lib_device_ip_query(follow_pc->mac, follow_addr)) {
+			chk_type = iptables_chk_ip;
+		} else
+#endif
+		{
+			chk_type = iptables_chk_mac;
+			snprintf(follow_addr, sizeof(follow_addr), "%s", follow_pc->mac);
+		}
 
 #ifdef RTCONFIG_PERMISSION_MANAGEMENT
 		if (!strcmp(follow_pc->mac, "")) continue;
 #endif
 
-		fprintf(fp, "-A PREROUTING -i %s %s %s -j %s\n", lan_if, chk_mac, follow_pc->mac, fftype);
+#ifdef RTCONFIG_PC_SCHED_V3
+		for(follow_e = follow_pc->events; follow_e != NULL; follow_e = follow_e->next){
+			int s_min = (follow_e->start_hour*60) + follow_e->start_min;
+			int e_min = (follow_e->end_hour*60) + follow_e->end_min;
+			char date_buf[64];
+			if(s_min >= e_min){  // over one day
+				if(!(follow_e->start_hour == 24 && follow_e->start_min == 0)) {
+					fprintf(fp, "-A PREROUTING -i %s -m time", lan_if);
+					if(follow_e->start_hour > 0 || follow_e->start_min > 0)
+						fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
+					fprintf(fp, "%s %s %s %s -j %s\n", DAYS_PARAM, get_pc_date_str(follow_e->day_of_week, 0, date_buf, sizeof(date_buf)), chk_type, follow_addr, fftype);
+				}
+				fprintf(fp, "-A PREROUTING -i %s -m time", lan_if);
+				if(!(follow_e->end_hour == 24 && follow_e->end_min == 0))
+					if(follow_e->end_hour > 0 || follow_e->end_min > 0)
+						fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
+				fprintf(fp, "%s %s %s %s -j %s\n", DAYS_PARAM, get_pc_date_str(follow_e->day_of_week, 1, date_buf, sizeof(date_buf)), chk_type, follow_addr, fftype);
+			} else {
+				fprintf(fp, "-A PREROUTING -i %s -m time", lan_if);
+				if(follow_e->start_hour > 0 || follow_e->start_min > 0)
+					fprintf(fp, " --timestart %d:%d", follow_e->start_hour, follow_e->start_min);
+				if(!(follow_e->end_hour == 24 && follow_e->end_min == 0))
+					if(follow_e->end_hour > 0 || follow_e->end_min > 0)
+						fprintf(fp, " --timestop %d:%d", follow_e->end_hour, follow_e->end_min);
+				fprintf(fp, "%s %s %s %s -j %s\n", DAYS_PARAM, get_pc_date_str(follow_e->day_of_week, 0, date_buf, sizeof(date_buf)), chk_type, follow_addr, fftype);
+			}
+		}
+#else
+		fprintf(fp, "-A PREROUTING -i %s %s %s -j %s\n", lan_if, chk_type, follow_addr, fftype);
 
 		for(follow_e = follow_pc->events; follow_e != NULL; follow_e = follow_e->next){
 			if(follow_e->start_day == follow_e->end_day){
 				if(follow_e->start_hour == follow_e->end_hour){ // whole week.
-					fprintf(fp, "-A %s -i %s %s %s -j ACCEPT\n", fftype, lan_if, chk_mac, follow_pc->mac);
+					fprintf(fp, "-A %s -i %s %s %s -j ACCEPT\n", fftype, lan_if, chk_type, follow_addr);
 				}
 				else{
 					fprintf(fp, "-A %s -i %s -m time", fftype, lan_if);
 					if(follow_e->start_hour > 0)
 						fprintf(fp, " --timestart %d:0", follow_e->start_hour);
-						if(follow_e->end_hour < 24)
-							fprintf(fp, " --timestop %d:0", follow_e->end_hour);
-						fprintf(fp, DAYS_PARAM "%s %s %s -j ACCEPT\n", datestr[follow_e->start_day], chk_mac, follow_pc->mac);
+					if(follow_e->end_hour < 24)
+						fprintf(fp, " --timestop %d:0", follow_e->end_hour);
+					fprintf(fp, DAYS_PARAM "%s %s %s -j ACCEPT\n", datestr[follow_e->start_day], chk_type, follow_addr);
+
+					if(follow_e->start_hour > follow_e->end_hour){
+						fprintf(fp, "-A %s -i %s -m time" DAYS_PARAM, fftype, lan_if);
+						for(i = follow_e->start_day+1; i < follow_e->start_day+7; ++i)
+							fprintf(fp, "%s%s", (i == follow_e->start_day+1)?"":",", datestr[i%7]);
+						fprintf(fp, " %s %s -j ACCEPT\n", chk_type, follow_addr);
 					}
 				}
-				else if(follow_e->start_day < follow_e->end_day
-						|| follow_e->end_day == 0
-						){ // start_day < end_day.
-					if(follow_e->end_day == 0)
-						follow_e->end_day += 7;
+			}
+			else if(follow_e->start_day < follow_e->end_day
+					|| follow_e->end_day == 0
+					){ // start_day < end_day.
+				if(follow_e->end_day == 0)
+					follow_e->end_day += 7;
 
 				// first interval.
 				fprintf(fp, "-A %s -i %s -m time", fftype, lan_if);
 				if(follow_e->start_hour > 0)
 					fprintf(fp, " --timestart %d:0", follow_e->start_hour);
-				fprintf(fp, DAYS_PARAM "%s %s %s -j ACCEPT\n", datestr[follow_e->start_day], chk_mac, follow_pc->mac);
+				fprintf(fp, DAYS_PARAM "%s %s %s -j ACCEPT\n", datestr[follow_e->start_day], chk_type, follow_addr);
 
 				// middle interval.
 				if(follow_e->end_day-follow_e->start_day > 1){
 					fprintf(fp, "-A %s -i %s -m time" DAYS_PARAM, fftype, lan_if);
 					for(i = follow_e->start_day+1; i < follow_e->end_day; ++i)
 						fprintf(fp, "%s%s", (i == follow_e->start_day+1)?"":",", datestr[i]);
-					fprintf(fp, " %s %s -j ACCEPT\n", chk_mac, follow_pc->mac);
+					fprintf(fp, " %s %s -j ACCEPT\n", chk_type, follow_addr);
 				}
 
 				// end interval.
@@ -76,15 +124,16 @@ void config_blocking_redirect(FILE *fp){
 					fprintf(fp, "-A %s -i %s -m time", fftype, lan_if);
 					if(follow_e->end_hour < 24)
 						fprintf(fp, " --timestop %d:0", follow_e->end_hour);
-					fprintf(fp, DAYS_PARAM "%s %s %s -j ACCEPT\n", datestr[follow_e->end_day], chk_mac, follow_pc->mac);
+					fprintf(fp, DAYS_PARAM "%s %s %s -j ACCEPT\n", datestr[follow_e->end_day], chk_type, follow_addr);
 				}
 			}
 			else
 				; // Don't care "start_day > end_day".
 		}
+#endif
 
 		// MAC address in list and not in time period -> Redirect to blocking page.
-		fprintf(fp, "-A %s -i %s ! -d %s/%s -p tcp --dport 80 %s %s -j DNAT --to-destination %s:%s\n", fftype, lan_if,lan_ip, lan_mask, chk_mac, follow_pc->mac, lan_ip, DFT_SERV_PORT);
+		fprintf(fp, "-A %s -i %s ! -d %s/%s -p tcp --dport 80 %s %s -j DNAT --to-destination %s:%s\n", fftype, lan_if,lan_ip, lan_mask, chk_type, follow_addr, lan_ip, DFT_SERV_PORT);
 	}
 
 	free_pc_list(&enabled_list);

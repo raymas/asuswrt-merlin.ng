@@ -1171,6 +1171,8 @@ typedef struct {
 	uint32			rx_pkts_retried;	/* # rx with retry bit set */
 	uint32			tx_rate_fallback;	/* lowest fallback TX rate */
 	wl_rateset_args_t	rateset_adv;	/* rateset along with mcs index bitmap */
+
+	uint32			wnm_cap;		/* wnm capabilities */
 } sta_info_t;
 
 #define WL_OLD_STAINFO_SIZE	OFFSETOF(sta_info_t, tx_tot_pkts)
@@ -7001,5 +7003,11 @@ typedef struct mupkteng_tx {
 
 #define WL_MUPKTENG_PER_TX_START		0x10
 #define WL_MUPKTENG_PER_TX_STOP		        0x20
+
+/* WET host ip and mac parameter configuration */
+typedef struct wet_host {
+	uint8 buf[6]; /* ip or mac*/
+	uint8 bssidx;
+} wet_host_t;
 
 #endif /* _wlioctl_h_ */

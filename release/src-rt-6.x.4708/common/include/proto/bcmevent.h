@@ -224,7 +224,8 @@ typedef BWL_PRE_PACKED_STRUCT struct bcm_event {
 #define WLC_E_BCMC_CREDIT_SUPPORT	127	/* credit check for BCMC supported */
 #define WLC_E_PSTA_PRIMARY_INTF_IND	128	/* psta primary interface indication */
 #define WLC_E_RADAR_DETECTED	129	/* Radar Detected event */
-#define WLC_E_LAST			130	/* highest val + 1 for range checking */
+#define WLC_E_RRM                       130     /* RRM event */
+#define WLC_E_LAST			131	/* highest val + 1 for range checking */
 
 
 /* Table of event name strings for UIs and debugging dumps */
@@ -335,6 +336,8 @@ typedef struct wl_event_data_if {
 #define WLC_E_IF_ADD		1	/* bsscfg add */
 #define WLC_E_IF_DEL		2	/* bsscfg delete */
 #define WLC_E_IF_CHANGE		3	/* bsscfg role change */
+#define WLC_E_IF_BSSCFG_UP	4   /* bsscfg up */
+#define WLC_E_IF_BSSCFG_DOWN	5   /* bsscfg down */
 
 /* I/F role code in WLC_E_IF event */
 #define WLC_E_IF_ROLE_STA		0	/* Infra STA */
@@ -432,6 +435,15 @@ typedef struct wl_intfer_event {
 	uint16 status;			/* status */
 	uint8 txfail_histo[WLINTFER_STATS_NSMPLS]; /* txfail histo */
 } wl_intfer_event_t;
+
+#define RRM_EVENT_VERSION		0
+typedef struct wl_rrm_event {
+	int16 version;
+	int16 len;
+	int16 cat;		/* Category */
+	int16 subevent;
+	char payload[1]; /* Measurement payload */
+} wl_rrm_event_t;
 
 /* WLC_E_PSTA_PRIMARY_INTF_IND event data */
 typedef struct wl_psta_primary_intf_event {

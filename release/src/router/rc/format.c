@@ -100,7 +100,7 @@ void adjust_merlin_config(void)
 		}
 	}
 
-/* Migrate "remote gateway" and "push lan" to "client_access" */
+/* Migrate "remote gateway" and "push lan" to "client_access" (384.5) */
 	for (unit = 1; unit <= OVPN_SERVER_MAX; unit++) {
 		sprintf(varname_ori, "vpn_server%d_rgw", unit);
 
@@ -152,7 +152,7 @@ void adjust_merlin_config(void)
 		nvram_set("dev_fail_reboot", "1");
 	}
 
-/* Remove discontinued DNSFilter services */
+/* Remove discontinued DNSFilter services (384.7) */
 #ifdef RTCONFIG_DNSFILTER
 	globalmode = nvram_get_int("dnsfilter_mode");
 	if (globalmode == DNSF_SRV_NORTON1 || globalmode == DNSF_SRV_NORTON2 || globalmode == DNSF_SRV_NORTON3)
@@ -197,10 +197,6 @@ void adjust_merlin_config(void)
 		nvram_set("dns_fwd_local", "1");
 		nvram_unset("lan_dns_fwd_local");
 	}
-
-/* Migrate update server */
-	if (nvram_match("firmware_server", "https://fwupdate.lostrealm.ca/asuswrt-merlin"))
-		nvram_set("firmware_server", "https://fwupdate.asuswrt-merlin.net");
 
 /* Migrate dhcp_staticlist hostnames to dhcp_hostnames */
 #ifdef HND_ROUTER
@@ -265,6 +261,12 @@ void adjust_merlin_config(void)
 		if (nv) free(nv);
 		if (newstr) free(newstr);
 		if (hostnames) free(hostnames);
+	}
+
+/* Migrade DDNS external IP check (386.1) */
+	if(!nvram_is_empty("ddns_ipcheck")) {
+		nvram_set("ddns_realip_x", nvram_get("ddns_ipcheck"));
+		nvram_unset("ddns_ipcheck");
 	}
 }
 
@@ -374,7 +376,7 @@ void adjust_access_restrict_config(void)
 }
 
 #if defined(RTCONFIG_VPN_FUSION)
-static VPNC_PROFILE vpnc_profile_tmp[MAX_VPNC_PROFILE] = {0};
+static VPNC_PROFILE vpnc_profile_tmp[MAX_VPNC_PROFILE] = {{0}};
 static int vpnc_prof_cnt_tmp;
 
 static int _find_active_vpnc_id()
@@ -441,7 +443,7 @@ void adjust_vpnc_config(void)
 	char *vpnc_dev_policy_list;
 	int active_id, i, default_wan_idx = 0, flag = 0;
 	char buf[1024];
-	char *nv = NULL, *nvp = NULL, *b = NULL, *mac, *static_ip, *desc, *proto, *server, *username, *passwd;
+	char *nv = NULL, *nvp = NULL, *b = NULL, *mac, *static_ip, *desc, *proto, *server, *username, *passwd, *dns;
 
 	_dprintf("[%s, %d]\n", __FUNCTION__, __LINE__);
 	vpnc_clientlist = nvram_safe_get("vpnc_clientlist");
@@ -499,7 +501,7 @@ void adjust_vpnc_config(void)
 		i = 0;
 		
 		while (nv && (b = strsep(&nvp, "<")) != NULL ) {
-			if (vstrsep(b, ">", &mac, &static_ip) < 2)
+			if (vstrsep(b, ">", &mac, &static_ip, &dns) < 2)
 				continue;
 
 #ifdef USE_IPTABLE_ROUTE_TARGE

@@ -74,7 +74,7 @@ helpcontent[3] = new Array("",
 							"<#WLANConfig11b_x_roamingassit_desc#>",	//31
 							"<#WLANConfig11b_x_Airtime_Fairness_itemdesc#>",
 							"<#WLANConfig11b_x_Auto#>",
-							"Enable/Disable Bluetooth Coexisistence. Data rate 1Mbps and 2 Mbps are not allowed in Pre-emptive mode. TX Bursting is also not allowed in Pre-emptive mode."
+							"<#WLANConfig11b_x_BTCoexistence_itemdesc#>"
 							 );
 
 helpcontent[4] = new Array("",
@@ -93,9 +93,12 @@ helpcontent[5] = new Array("",
 							 "<#LANHostConfig_x_WINSServer_itemdesc#>",
 							 "<#LANHostConfig_ManualDHCPEnable_itemdesc#>",
 							 "<#LANHostConfig_ManualDHCPMacaddr_itemdesc#>",
-							 "<#LANHostConfig_ManualDHCPMulticast_itemdesc#>",
+							 "<#LANHostConfig_ManualDHCPMulticast_itemdesc#>",	//11
 							 "<#LANHostConfig_ManualDHCPSTB_itemdesc#>",
-							 "<#LANHostConfig_x_DDNSHostNames_itemdesc#>");
+							 "<#LANHostConfig_x_DDNSHostNames_itemdesc#>",
+							 "<#RouterConfig_IGMPver_itemname#>",
+							 "<#RouterConfig_MLDver_itemname#>",
+							 "Enable Fast Leave");
 helpcontent[6] = new Array("",
 						   "<#RHELP_desc4#>",
 						   "<#RHELP_desc5#>",
@@ -145,8 +148,7 @@ helpcontent[7] = new Array("",
 							 "The IP address of the nameserver.",
 							 "TLS Port  (defaults to 853 if left empty).",
 							 "Authentication domain name checked against the server certificate.",
-							 "(Optional) Base64 hash value of the sha256 fingerprint of the public key.",
-							 "Pre-configured servers, select one to prefill the fields below for you, then click on the Add button to add it to the list.");	//41
+							 "(Optional) Base64 hash value of the sha256 fingerprint of the public key.");	// 40
 
 //Firewall
 helpcontent[8] = new Array("",
@@ -179,7 +181,9 @@ helpcontent[11] = new Array("",
 							"<#LANHostConfig_x_TimeZone_DSTEnd_desc#>",
 							"For destination IP address, you can:<br/>(a) enter a specific IP address, such as \"192.168.1.2\"<br/>(b) enter IP addresses within one subnet or within the same IP pool, such as \"192.168.1.0/24\"",	/* untranslated */
 							"<#System_Allow_Specified_IP#>",
-							"<#usb_HDD_Hibernation_Desc#>");
+							"<#usb_HDD_Hibernation_Desc#>",
+							"If there is no client connection for more than 1 minute, the PLC will enter sleep mode (power saving). The PLC will not wake up until the client connects. (It takes about ten seconds to wake up the PLC)", /* untranslated */
+							"Enable Login CAPTCHA is to ensure only human users to pass through and prevent brute force login attack."); /* untranslated */
 //Log
 helpcontent[12] = new Array("",
 							"<#General_x_SystemUpTime_itemdesc#>",
@@ -229,10 +233,11 @@ helpcontent[18] = new Array("",
 helpcontent[19] = new Array("",
 							"<#Setting_factorydefault_itemdesc#>",
 							"<#Setting_save_itemdesc#>",
-							"<#Setting_upload_itemdesc#>");
+							"<#Setting_upload_itemdesc#>",
+							"<#Setting_factorydefault_itemdesc_dpi#>"
+							);
 // QoS
 helpcontent[20] = new Array("",
-							"",
 							'<#EzQoS_bandwidth_note1#>',
 							"<#min_bound_desc#>",
 							"<#max_bound_desc#>",
@@ -358,7 +363,7 @@ helpcontent[32] = new Array("",
 							"Add an additional layer of HMAC authentication on top of the TLS control channel to protect against DoS attacks. An OpenVPN static key will be used.",/*untranslated*/	//10
 							"This directive will set up an OpenVPN server which will allocate addresses to clients out of the given network/netmask. The server itself will take the \".1\" address of the given network for use as the server-side end‐point of the local TUN/TAP interface.",/*untranslated*/
 							"The IP address of the local and remote VPN endpoint in p2p mode.",/*untranslated*/
-							"<b>Yes</b>: Use LAN DHCP server to allocate IP address;<br> <b>No</b>: Allocate IP address from the Address Pool",/*untranslated*/
+							"<b><#checkbox_Yes#></b>: Use LAN DHCP server to allocate IP address;<br> <b><#checkbox_No#></b>: Allocate IP address from the Address Pool",/*untranslated*/
 							"The first address and the last address in the pool to be assigned to clients.",/*untranslated*/							
 							"Response the DNS query from clients.",/*untranslated*/
 							"In server mode, provide DNS information to clients.",/*untranslated*/
@@ -378,13 +383,15 @@ helpcontent[32] = new Array("",
 
 //IPSec
 helpcontent[33] = new Array("",
-							"<#vpn_ipsec_Key_Retries_Hint#>"
+							"<#vpn_ipsec_Key_Retries_Hint#>",
+							"<#vpn_ipsec_re_cert_hint#>"
 							);
 
 
 //Feedback
 helpcontent[34] = new Array("",
-							"This feature allows system to capture diagnostic System debug log in the background, duration depends on the “Diagnostic debug log capture duration” option, depends on the option selected, system might transmit single debug log automatically to ASUS Support Team for analysis after capture completed or transmit multiple debug logs over a period of time. Click on the yellow System icon could cancel the debug log capture."/*untranslated*/
+							"This feature allows system to capture diagnostic System debug log in the background, duration depends on the “Diagnostic debug log capture duration” option, depends on the option selected, system might transmit single debug log automatically to ASUS Support Team for analysis after capture completed or transmit multiple debug logs over a period of time. Click on the yellow System icon could cancel the debug log capture.",/*untranslated*/
+							"<#Feedback_case_No_desc#>"
 							);
 
 helpcontent[50] = new Array("",

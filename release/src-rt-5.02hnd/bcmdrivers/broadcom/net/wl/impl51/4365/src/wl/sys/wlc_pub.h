@@ -893,6 +893,7 @@ typedef struct wlc_pub {
 	bool		_dyn160;		/* DYN160 capability - dynamic 160/80p80 <-> 80 */
 	uint32		_dyn160_active;		/* DYN160 active - dynamic 160/80p80 <-> 80 */
 	bool		_fbt_cap;		/* Fast Bss Transition capable */
+	bool		_mbss_ign_mac_valid;	/* Ignore validation/auto-generation of MBSS MACs */
 } wlc_pub_t;
 
 /* Shared portion of wlc_pub structure across WLC's in case of RSDB. */
@@ -1483,10 +1484,25 @@ wlc_pkttag_bsscfg_get(void *p)
 #define	PSTA_IS_PROXY(wlc)	(0)
 #define	PSTA_IS_REPEATER(wlc)	(0)
 #endif /* PSTA */
+
+#if defined(WET) && defined(WET_DONGLE)
+#error "Don't use WET and WET_DONGLE in the same build"
+#endif
+
+#if defined(DONGLEBUILD) && defined(WET)
+#error "Use WET_DONGLE iso WET for donglebuilds"
+#endif
+
 #ifdef WET
-#define WET_ENAB(wlc)	(wlc->wet_enab)
+#define WET_ENAB(wlc)		(wlc->wet)
 #else
-#define WET_ENAB(wlc)	(0)
+#define WET_ENAB(wlc)		(0)
+#endif
+
+#ifdef WET_DONGLE
+#define WET_DONGLE_ENAB(wlc)	(wlc->wet_dongle)
+#else
+#define WET_DONGLE_ENAB(wlc)	(0)
 #endif
 
 #if defined(PKTC) || defined(PKTC_DONGLE)
@@ -1607,22 +1623,28 @@ wlc_pkttag_bsscfg_get(void *p)
 		#define MBSS_ENAB4(pub)		((pub)->_mbss_mode == MBSS4_ENABLED)
 		#define MBSS_ENAB16(pub)	((pub)->_mbss_mode == MBSS16_ENABLED)
 		#define MBSS_SUPPORT(pub)	((pub)->_mbss_support)
+		#define MBSS_IGN_MAC_VALID(pub)	((pub)->_mbss_ign_mac_valid && \
+			(pub)->_mbss_mode)
 	#elif defined(MBSS_DISABLED)
 		#define MBSS_ENAB(pub)		(0)
 		#define MBSS_ENAB4(pub)		(0)
 		#define MBSS_ENAB16(pub)	(0)
 		#define MBSS_SUPPORT(pub)	(0)
+		#define MBSS_IGN_MAC_VALID(pub)	(0)
 	#else
 		#define MBSS_ENAB(pub)		((pub)->_mbss_mode)
 		#define MBSS_ENAB4(pub)		((pub)->_mbss_mode == MBSS4_ENABLED)
 		#define MBSS_ENAB16(pub)	((pub)->_mbss_mode == MBSS16_ENABLED)
 		#define MBSS_SUPPORT(pub)	(1)
+		#define MBSS_IGN_MAC_VALID(pub)	((pub)->_mbss_ign_mac_valid && \
+			(pub)->_mbss_mode)
 	#endif
 #else /* !MBSS */
 	#define MBSS_ENAB(pub)			(0)
 	#define MBSS_ENAB4(pub)			(0)
 	#define MBSS_ENAB16(pub)		(0)
 	#define MBSS_SUPPORT(pub)		(0)
+	#define MBSS_IGN_MAC_VALID(pub)		(0)
 #endif /* MBSS */
 
 #if defined(WME_PER_AC_TX_PARAMS)

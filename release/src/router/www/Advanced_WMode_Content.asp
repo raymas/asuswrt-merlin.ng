@@ -12,13 +12,6 @@
 <link rel="stylesheet" type="text/css" href="index_style.css"> 
 <link rel="stylesheet" type="text/css" href="form_style.css">
 <style>
-#pull_arrow{
- 	float:center;
- 	cursor:pointer;
- 	border:2px outset #EFEFEF;
- 	background-color:#CCC;
- 	padding:3px 2px 4px 0px;
-}
 #WDSAPList{
 	border:1px outset #999;
 	background-color:#576D73;
@@ -61,6 +54,7 @@
 <script language="JavaScript" type="text/javascript" src="/popup.js"></script>
 <script language="JavaScript" type="text/javascript" src="/validator.js"></script>
 <script language="JavaScript" type="text/JavaScript" src="/js/jquery.js"></script>
+<script language="JavaScript" type="text/JavaScript" src="/js/httpApi.js"></script>
 <script>
 <% wl_get_parameter(); %>
 
@@ -95,7 +89,7 @@ function initial(){
 		document.getElementById("wl_wdslist_Block").style.display = "none";
 		document.getElementById("submitBtn").style.display = "none";
 	}
-	else if (based_modelid == "RT-AD7200" && '<% nvram_get("wl_unit"); %>' == '3') {
+	else if (band60g_support && '<% nvram_get("wl_unit"); %>' == '3') {
 		document.getElementById("wl_2g_mac").style.display = "none";
 		document.getElementById("wl_5g_mac").style.display = "none";
 		document.getElementById("wl_5g_mac_2").style.display = "none";
@@ -119,9 +113,22 @@ function initial(){
 	}
 	
 	if(wl_info.band5g_2_support){
+		if(band6g_support){
+			document.getElementById("5g2_title").innerHTML = "6 GHz MAC";
+		}
+
 		document.getElementById("wl_5g_mac_2").style.display = "";
-		document.getElementById("wl_5g_mac_th1").innerHTML = "5GHz-1 MAC";
+		document.getElementById("wl_5g_mac_th1").innerHTML = "5 GHz-1 MAC";
 	}
+
+	$("#redirect_to_setup")
+		.attr('target','_self')
+		.attr("href", "Advanced_Wireless_Content.asp")
+		.attr("style", "text-decoration:underline;color:#FFCC00;");
+	$("#redirect_to_FAQ")
+		.attr('target','_blank')
+		.attr("style", "text-decoration:underline;color:#FFCC00;cursor: pointer;");
+	httpApi.faqURL("1039910", function(url){document.getElementById("redirect_to_FAQ").href=url;});
 
 	wl_bwch_hint();
 	setTimeout("wds_scan();", 500);
@@ -174,7 +181,7 @@ function addRow(obj, upper){
 		obj.focus();
 		obj.select();
 		return false;
-	}else if (!check_macaddr(obj, check_hwaddr_flag(obj))){
+	}else if (!check_macaddr(obj, check_hwaddr_flag(obj, 'inner'))){
 		obj.focus();
 		obj.select();		
 		return false;
@@ -383,7 +390,7 @@ function checkWLReady(){
 </script>
 </head>
 
-<body onload="initial();" onunLoad="return unload_body();">
+<body onload="initial();" onunLoad="return unload_body();" class="bg">
 <div id="TopBanner"></div>
 <div id="Loading" class="popup_bg"></div>
 
@@ -431,7 +438,10 @@ function checkWLReady(){
 									<div class="formfonttitle"><#menu5_1#> - <#menu5_1_3#></div>
 									<div style="margin:10px 0 10px 5px;" class="splitLine"></div>
 									<div class="formfontdesc"><#WLANConfig11b_display1_sectiondesc#></div>
-									<div class="formfontdesc" style="color:#FFCC00;"><#ADSL_FW_note#><#WLANConfig11b_display2_sectiondesc#></div>
+									<div class="formfontdesc" style="color:#FFCC00;"><#ADSL_FW_note#></div>
+									<div class="formfontdesc" style="color:#FFCC00;margin-left:28px;">
+										<#WLANConfig11b_display2_sectiondesc#>&nbsp;<#WLANConfig11b_display21_sectiondesc#><br><#Setup_note#>
+									</div>
 									<div class="formfontdesc"><#WLANConfig11b_display3_sectiondesc#>
 										<ol>
 											<li><#WLANConfig11b_display31_sectiondesc#></li>
@@ -450,19 +460,19 @@ function checkWLReady(){
 										</tr>
 										</thead>		  
 										<tr id="wl_2g_mac">
-											<th>2.4GHz MAC</th>
+											<th>2.4 GHz MAC</th>
 											<td>
 												<input type="text" maxlength="17" class="input_20_table" id="wl0_hwaddr" name="wl0_hwaddr" value="<% nvram_get("wl0_hwaddr"); %>" readonly autocorrect="off" autocapitalize="off">
 											</td>		
 										</tr>					
 										<tr id="wl_5g_mac">
-											<th id="wl_5g_mac_th1">5GHz MAC</th>
+											<th id="wl_5g_mac_th1">5 GHz MAC</th>
 											<td>
 												<input type="text" maxlength="17" class="input_20_table" id="wl1_hwaddr" name="wl1_hwaddr" value="<% nvram_get("wl1_hwaddr"); %>" readonly autocorrect="off" autocapitalize="off">
 											</td>		
 										</tr>	
 										<tr id="wl_5g_mac_2" style="display:none">
-											<th>5GHz-2 MAC</th>
+											<th id="5g2_title">5 GHz-2 MAC</th>
 											<td>
 												<input type="text" maxlength="17" class="input_20_table" id="wl2_hwaddr" name="wl2_hwaddr" value="<% nvram_get("wl2_hwaddr"); %>" readonly autocorrect="off" autocapitalize="off">
 											</td>		
@@ -470,10 +480,7 @@ function checkWLReady(){
 										<tr id="wl_unit_field">
 											<th><#Interface#></th>
 											<td>
-												<select name="wl_unit" class="input_option" onChange="change_wl_unit();">
-													<option class="content_input_fd" value="0" <% nvram_match("wl_unit", "0","selected"); %>>2.4GHz</option>
-													<option class="content_input_fd" value="1"<% nvram_match("wl_unit", "1","selected"); %>>5GHz</option>
-												</select>			
+												<select name="wl_unit" class="input_option" onChange="change_wl_unit();"></select>			
 											</td>
 										</tr>
 										<tr id="repeaterModeHint" style="display:none;">

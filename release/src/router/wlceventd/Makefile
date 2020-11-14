@@ -10,9 +10,12 @@ include $(SRCBASE)/router/.config
 
 CFLAGS	+= -I. -I$(TOP)/shared -I$(SRCBASE)/include -I$(SRCBASE)/common/include -Wall -Werror
 CFLAGS	+= $(if $(WLAN_ComponentIncPath),$(WLAN_ComponentIncPath),$(addprefix -I,$(wildcard $(SRCBASE)/shared/bcmwifi/include)))
+ifeq ($(HND_ROUTER_AX), y)
+CFLAGS  += -I$(SRCBASE)/../components/math/include -I$(SRCBASE)/../components/proto/include -I$(SRCBASE)/../components/wlioctl/include
+endif
 #CFLAGS	+= -g -DDEBUG
-CFLAGS	+= -s -O2
-LDFLAGS += -L$(TOP)/nvram$(BCMEX)${EX7} ${EXTRA_NV_LDFLAGS} -lnvram
+CFLAGS	+= -s -O2 $(EXTRACFLAGS)
+LDFLAGS += -L$(TOP_PLATFORM)/nvram$(BCMEX)${EX7} ${EXTRA_NV_LDFLAGS} -lnvram
 LDFLAGS += -L$(TOP)/shared -L$(INSTALLDIR)/shared/usr/lib -lshared
 LDFLAGS += $(EXTRALDFLAGS)
 
@@ -62,7 +65,7 @@ vpath %.c $(SRCBASE)/shared $(WLAN_ComponentSrcDirs)
 
 ifeq ($(wildcard $(SRCBASE)/router/wlceventd/*.c),)
 all:
-	-cp -f prebuilt$(BCMEX)$(EX7)/wlceventd wlceventd
+	-cp -f prebuilt/$(BUILD_NAME)/wlceventd wlceventd
 else
 all: wlceventd
 endif

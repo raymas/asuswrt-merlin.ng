@@ -1,3 +1,6 @@
+#ifndef __PC_H__
+#define __PC_H__ 1
+
 #define MIN_DAY 1
 #define MAX_DAY 7
 
@@ -7,11 +10,15 @@
 //#define BLOCKLOCAL
 
 #define iptables_chk_mac "-m mac --mac-source"
+#define iptables_chk_ip "-s"
 extern char *datestr[];
 
 typedef struct pc_event pc_event_s;
 struct pc_event{
 	char e_name[32];
+#ifdef RTCONFIG_SCHED_V2
+	int day_of_week;
+#endif
 	int start_day;
 	int end_day;
 	int start_hour;
@@ -21,15 +28,30 @@ struct pc_event{
 	pc_event_s *next;
 };
 
+enum {
+	INITIAL,
+	NONBLOCK,
+	BLOCKED,
+	DTIME
+};
+
 typedef struct pc pc_s;
 struct pc{
 	int enabled;
+	char state;
+	char prev_state;
+	int dtimes;
 	char device[32];
 	char mac[18];
 	pc_event_s *events;
 	unsigned long long timestamp;
 	pc_s *next;
 };
+
+#ifdef RTCONFIG_SCHED_V2
+char *get_pc_date_str(int day_of_week, int over_one_day, char *buf, int buf_size);
+pc_event_s *get_event_list_by_sched_v2(pc_event_s **target_list, char *sched_v2_str);
+#endif
 
 extern pc_s *get_all_pc_list(pc_s **pc_list);
 extern pc_s *get_all_pc_tmp_list(pc_s **pc_list);
@@ -47,6 +69,10 @@ extern void print_pc_list(pc_s *pc_list);
 extern pc_s *match_enabled_pc_list(pc_s *pc_list, pc_s **target_list, int enabled);
 extern pc_s *match_day_pc_list(pc_s *pc_list, pc_s **target_list, int target_day);
 extern pc_s *match_daytime_pc_list(pc_s *pc_list, pc_s **target_list, int target_day, int target_hour);
-
+#ifdef RTCONFIG_CONNTRACK
+extern int cleantrack_daytime_pc_list(pc_s *pc_list, int target_day, int target_hour, int verb);
+#endif
 extern void config_daytime_string(pc_s *pc_list, FILE *fp, char *logaccept, char *logdrop, int temp);
-extern int count_pc_rules(pc_s *pc_list);
+extern void config_pause_block_string(pc_s *pc_list, FILE *fp, char *logaccept, char *logdrop, int temp);
+extern int count_pc_rules(pc_s *pc_list, int enabled);
+#endif // #ifndef __PC_H__
